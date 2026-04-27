@@ -180,6 +180,80 @@ p { margin: 0; }
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+.page-banner-carousel {
+  margin-top: 22px;
+  display: grid;
+  gap: 12px;
+}
+.page-banner-stage {
+  min-height: 190px;
+}
+.banner-slide {
+  position: relative;
+  overflow: hidden;
+  min-height: 190px;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--banner-tone) 30%, transparent), transparent 28%),
+    linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01)),
+    linear-gradient(180deg, rgba(15, 23, 48, 0.92), rgba(9, 14, 28, 0.96));
+}
+.banner-slide-copy {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 12px;
+  max-width: 640px;
+}
+.banner-slide-copy h3 {
+  font-size: clamp(1.5rem, 2.4vw, 2.4rem);
+  line-height: 1.04;
+}
+.banner-slide-copy .muted {
+  line-height: 1.7;
+  max-width: 560px;
+}
+.banner-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(6px);
+  opacity: 0.55;
+}
+.banner-orb-a {
+  right: 64px;
+  top: 24px;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--banner-tone) 42%, white) 0%, transparent 72%);
+}
+.banner-orb-b {
+  right: 24px;
+  bottom: 12px;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(255,255,255,0.16) 0%, transparent 74%);
+}
+.page-banner-dots {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-start;
+}
+.banner-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: transform .18s ease, background-color .18s ease, width .18s ease;
+}
+.banner-dot.active {
+  width: 28px;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+}
 .hero-card {
   border-radius: 28px;
   min-height: 280px;
@@ -556,6 +630,9 @@ textarea { min-height: 110px; resize: vertical; }
   .news-grid { grid-template-columns: 1fr; }
   .page-banner-body { grid-template-columns: 1fr; align-items: start; }
   .page-banner-actions { justify-content: flex-start; }
+  .banner-slide {
+    min-height: 170px;
+  }
   .site-header { grid-template-columns: 1fr; }
   .main-nav { justify-content: flex-start; }
   .pricing-hero .section-heading,
@@ -627,6 +704,21 @@ textarea { min-height: 110px; resize: vertical; }
   .seat-row {
     grid-template-columns: 28px repeat(auto-fit, minmax(28px, 1fr));
     gap: 6px;
+  }
+  .banner-slide {
+    padding: 18px;
+  }
+  .banner-orb-a {
+    right: -12px;
+    top: -8px;
+    width: 120px;
+    height: 120px;
+  }
+  .banner-orb-b {
+    right: 10px;
+    bottom: -12px;
+    width: 100px;
+    height: 100px;
   }
   .seat {
     min-width: 28px;

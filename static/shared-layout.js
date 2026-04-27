@@ -74,6 +74,10 @@ shell.innerHTML = `
           </div>
           <div class="page-banner-actions" id="page-banner-actions"></div>
         </div>
+        <div class="page-banner-carousel">
+          <div class="page-banner-stage" id="page-banner-stage"></div>
+          <div class="page-banner-dots" id="page-banner-dots"></div>
+        </div>
       </section>
       <div id="main-content"></div>
     </section>

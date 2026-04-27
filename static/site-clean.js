@@ -8,6 +8,8 @@ const state = {
   activeShowId: Number(localStorage.getItem("ticketrush-show")) || 0,
   detail: null,
   pollId: null,
+  bannerTimer: null,
+  bannerIndex: 0,
 };
 
 localStorage.setItem("ticketrush-client", state.clientId);
@@ -25,6 +27,8 @@ const el = {
   pageBannerSummary: document.querySelector("#page-banner-summary"),
   pageBannerStats: document.querySelector("#page-banner-stats"),
   pageBannerActions: document.querySelector("#page-banner-actions"),
+  pageBannerStage: document.querySelector("#page-banner-stage"),
+  pageBannerDots: document.querySelector("#page-banner-dots"),
   loginDialog: document.querySelector("#login-dialog"),
   registerDialog: document.querySelector("#register-dialog"),
   checkoutDialog: document.querySelector("#checkout-dialog"),
@@ -208,6 +212,7 @@ function renderPage() {
 
 function renderPageBanner() {
   const show = currentShow();
+  const firstNews = state.catalog?.news?.[0];
   const configs = {
     home: {
       title: "Platform Overview",
@@ -217,14 +222,21 @@ function renderPageBanner() {
         { href: "/booking.html", label: "Start booking", kind: "primary-button" },
         { href: "/movies.html", label: "Browse movies", kind: "ghost-button" },
       ],
+      slides: [
+        { kicker: "Featured show", title: show?.title || "Live release", body: show?.description || "Active release details appear here.", tone: show?.heroColor || "#f97316" },
+        { kicker: "Live venue", title: show?.venue || "Current cinema", body: show ? `Session starts ${fmtTime(show.startTime)}.` : "Schedule information updates here.", tone: "#38bdf8" },
+        { kicker: "Fast path", title: "Jump into booking", body: "Move from discovery to seat locking with a single action from the current page hero.", tone: "#ef4444" },
+      ],
     },
     pricing: {
       title: "Ticket Pricing",
       summary: "Review the pricing structure for each seat class, then move into the live seat map where the final ticket value is determined by the seat you actually lock.",
       stats: [show?.title, show?.venue, show ? `From ${fmtMoney(minPriceCents(show))}` : null],
-      actions: [
-        { href: "/booking.html", label: "Open seat map", kind: "primary-button" },
-        { href: "/theaters.html", label: "Change cinema", kind: "ghost-button" },
+      actions: [],
+      slides: [
+        { kicker: "Reference", title: "Pricing stays in sync", body: "Every tier on this page is pulled from the active show, so the booking screen uses the same source of truth.", tone: "#f59e0b" },
+        { kicker: "Current entry", title: show?.title || "Current show", body: show?.venue || "Venue details", tone: show?.heroColor || "#38bdf8" },
+        { kicker: "Checkout rule", title: "Final total comes from seats", body: "The amount you pay is always calculated from the exact seats you lock in the booking flow.", tone: "#ef4444" },
       ],
     },
     news: {
@@ -233,6 +245,11 @@ function renderPageBanner() {
       stats: [show?.venue, "Editorial feed", `${(state.catalog?.news || []).length} stories`],
       actions: [
         { href: "/booking.html", label: "Book now", kind: "primary-button" },
+      ],
+      slides: [
+        { kicker: "Featured story", title: firstNews?.title || "Cinema updates", body: firstNews?.summary || "Latest editorial updates appear here.", tone: "#38bdf8" },
+        { kicker: "Campaigns", title: "Promotions update in real time", body: "Use the news section to surface offers, launches, and booking pushes tied to active sessions.", tone: "#f59e0b" },
+        { kicker: "Live push", title: show?.venue || "Current branch", body: "Editorial content can be paired with the branch or title the user is currently viewing.", tone: "#ef4444" },
       ],
     },
     member: {
@@ -246,30 +263,55 @@ function renderPageBanner() {
       actions: state.session.authenticated
         ? [{ href: "/booking.html", label: "Use member benefits", kind: "primary-button" }]
         : [{ action: "login", label: "Sign in", kind: "primary-button" }],
+      slides: [
+        { kicker: "Tier status", title: state.session.authenticated ? state.session.user?.tier : "Guest Mode", body: state.session.authenticated ? `${state.session.user?.points || 0} points available for the next booking.` : "Sign in to unlock points, history, and faster checkout.", tone: "#f59e0b" },
+        { kicker: "Benefits", title: "Membership rewards travel with you", body: "Your profile, points, and ticket history remain visible while browsing shows and checking out.", tone: "#38bdf8" },
+        { kicker: "Ticket memory", title: "Every purchase stays attached", body: "Confirmed orders remain tied to your account for easy access and QR retrieval.", tone: "#ef4444" },
+      ],
     },
     movies: {
       title: "Now Showing & Coming Soon",
       summary: "Review the active line-up, compare release timing, and move into booking from the title that fits your night.",
       stats: [`${state.catalog?.shows?.length || 0} titles`, show?.venue, show ? fmtTime(show.startTime) : null],
       actions: [{ href: "/booking.html", label: "Go to booking", kind: "primary-button" }],
+      slides: [
+        { kicker: "Now showing", title: show?.title || "Active line-up", body: show?.description || "Current title information appears here.", tone: show?.heroColor || "#38bdf8" },
+        { kicker: "Schedule", title: show?.venue || "Cinema branch", body: show ? `Session scheduled for ${fmtTime(show.startTime)}.` : "Session timing appears here.", tone: "#f59e0b" },
+        { kicker: "Decision point", title: "Compare first, book second", body: "Use this area to rotate through titles before entering the seat map.", tone: "#ef4444" },
+      ],
     },
     theaters: {
       title: "Theater Directory",
       summary: "Switch between active branches, compare schedules, and keep the current session synced across the rest of the site.",
       stats: [`${state.catalog?.theaters?.length || 0} branches`, show?.venue, show ? fmtTime(show.startTime) : null],
       actions: [{ href: "/booking.html", label: "Pick seats", kind: "primary-button" }],
+      slides: [
+        { kicker: "Branch view", title: show?.venue || "Active cinema", body: "The selected branch stays synced across pricing, booking, and member flows.", tone: "#38bdf8" },
+        { kicker: "Live session", title: show?.title || "Show preview", body: show ? `Current session starts ${fmtTime(show.startTime)}.` : "Live schedule details appear here.", tone: "#f59e0b" },
+        { kicker: "Switch fast", title: "Move between cinemas instantly", body: "Change the active venue on the left and the rest of the pages update around it.", tone: "#ef4444" },
+      ],
     },
     booking: {
       title: "Seat Selection & Checkout",
       summary: "Live seat availability, lock timers, and checkout are all tied to the active session shown here.",
       stats: [show?.title, show?.venue, show ? fmtTime(show.startTime) : null],
       actions: [{ href: "/pricing.html", label: "View pricing", kind: "ghost-button" }],
+      slides: [
+        { kicker: "Seat map", title: "Live availability", body: "Seats change state in real time while locks and releases update around the current session.", tone: "#22c55e" },
+        { kicker: "Order timer", title: "Short lock window", body: "The booking flow is designed around temporary holds, queue admission, and decisive checkout.", tone: "#f59e0b" },
+        { kicker: "Current event", title: show?.title || "Selected show", body: show?.venue || "Venue information", tone: "#ef4444" },
+      ],
     },
     admin: {
       title: "Admin Dashboard",
       summary: "Monitor sales, occupancy, and audience mix while controlling new launches from the same workspace.",
       stats: [`${state.dashboard?.events?.length || 0} sessions`, "Live metrics", show?.venue],
       actions: [{ href: "/booking.html", label: "Open customer flow", kind: "ghost-button" }],
+      slides: [
+        { kicker: "Live metrics", title: "Operations overview", body: "Track occupancy, revenue, and queue behavior from the same admin surface.", tone: "#38bdf8" },
+        { kicker: "Launch control", title: `${state.dashboard?.events?.length || 0} active sessions`, body: "Add new sessions and manage pricing zones directly from the dashboard flow.", tone: "#f59e0b" },
+        { kicker: "Audience mix", title: "Customer insight", body: "Demographic snapshots help organizers understand who is buying and when.", tone: "#ef4444" },
+      ],
     },
   };
 
@@ -287,6 +329,52 @@ function renderPageBanner() {
     .join("");
 
   el.pageBannerActions.querySelector('[data-banner-action="login"]')?.addEventListener("click", () => el.loginDialog.showModal());
+  renderBannerSlides(config.slides || []);
+}
+
+function renderBannerSlides(slides) {
+  clearInterval(state.bannerTimer);
+  state.bannerTimer = null;
+  state.bannerIndex = 0;
+
+  if (!slides.length) {
+    el.pageBannerStage.innerHTML = "";
+    el.pageBannerDots.innerHTML = "";
+    return;
+  }
+
+  const draw = () => {
+    const slide = slides[state.bannerIndex] || slides[0];
+    el.pageBannerStage.innerHTML = `
+      <article class="banner-slide" style="--banner-tone: ${slide.tone || "#38bdf8"}">
+        <div class="banner-slide-copy">
+          <p class="eyebrow">${slide.kicker || "Spotlight"}</p>
+          <h3>${slide.title || ""}</h3>
+          <p class="muted">${slide.body || ""}</p>
+        </div>
+        <div class="banner-orb banner-orb-a"></div>
+        <div class="banner-orb banner-orb-b"></div>
+      </article>
+    `;
+    el.pageBannerDots.innerHTML = slides
+      .map((_, index) => `<button class="banner-dot ${index === state.bannerIndex ? "active" : ""}" type="button" data-banner-dot="${index}" aria-label="Show slide ${index + 1}"></button>`)
+      .join("");
+
+    [...el.pageBannerDots.querySelectorAll("[data-banner-dot]")].forEach((button) =>
+      button.addEventListener("click", () => {
+        state.bannerIndex = Number(button.dataset.bannerDot);
+        draw();
+      })
+    );
+  };
+
+  draw();
+  if (slides.length > 1) {
+    state.bannerTimer = window.setInterval(() => {
+      state.bannerIndex = (state.bannerIndex + 1) % slides.length;
+      draw();
+    }, 4200);
+  }
 }
 
 function minPriceCents(show = currentShow()) {
