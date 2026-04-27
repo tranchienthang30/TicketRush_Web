@@ -115,7 +115,7 @@ function renderMemberSummary() {
       <h3>${user.name}</h3>
       <p class="muted">${user.email}</p>
       <div class="quick-stats">
-        <span class="mini-chip">${user.tier}</span>
+        <span class="mini-chip ${tierClass(user.tier)}">${user.tier}</span>
         <span class="mini-chip">${user.points} pts</span>
       </div>
     </article>
@@ -303,13 +303,6 @@ function renderTheatersPage() {
 function renderPricingPage() {
   el.mainContent.innerHTML = `
     <section class="section-card pricing-hero">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">Pricing</p>
-          <h2>Simple, readable pricing without hidden surprises</h2>
-        </div>
-        <span class="pill">Updated for this season</span>
-      </div>
       <p class="lead-copy">Choose the seat class that fits the occasion, then match it with your preferred session time. Weekend uplift is stated upfront so the final ticket price feels clear, consistent, and easy to trust.</p>
       <div class="pricing-grid">
         ${state.catalog.pricing
@@ -339,27 +332,24 @@ function renderPricingPage() {
 }
 
 function renderNewsPage() {
+  const newsItems = (state.catalog.news || []).map(normalizeNewsItem);
+  const featured = newsItems[0];
+  const secondary = newsItems.slice(1);
+
   el.mainContent.innerHTML = `
     <section class="section-card news-hero">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">News</p>
-          <h2>Fresh launches, promos, and cinema updates</h2>
-        </div>
-        <span class="pill">Editorial Feed</span>
-      </div>
       <div class="news-feature">
         <div>
           <p class="eyebrow">Featured Story</p>
-          <h3>${state.catalog.news[0]?.title || "Latest campaign"}</h3>
-          <p class="lead-copy">${state.catalog.news[0]?.summary || "Return here for weekly launches, curated offers, and fresh editorial highlights from across the circuit."}</p>
+          <h3>${featured?.title || "Latest campaign"}</h3>
+          <p class="lead-copy">${featured?.summary || "Return here for weekly launches, curated offers, and fresh editorial highlights from across the circuit."}</p>
         </div>
       </div>
       <div class="news-grid">
-        ${state.catalog.news
+        ${(secondary.length ? secondary : newsItems.slice(0, 2))
           .map(
-            (item, index) => `
-              <article class="news-card ${index === 0 ? "news-card-large" : ""}">
+            (item) => `
+              <article class="news-card">
                 <span class="tag-pill">${item.tag}</span>
                 <h3>${item.title}</h3>
                 <p class="muted">${item.summary}</p>
@@ -373,18 +363,39 @@ function renderNewsPage() {
   `;
 }
 
+function normalizeNewsItem(item = {}) {
+  const titleMap = {
+    "Mo them cum rap Riverside": "Riverside cinema expansion is now open",
+    "Tuan le member day": "Member Week is live",
+    "Gio vang bap nuoc": "Late-show snack hour",
+  };
+  const summaryMap = {
+    "Cum rap moi voi phong chieu 4K va ghe doi.": "A new branch with 4K projection, couple seats, and a faster online booking lane.",
+    "Nhan gap doi diem cho don dat ve qua web.": "Earn double reward points on confirmed web bookings throughout the campaign.",
+    "Giam gia combo cho suat chieu sau 20:30.": "Enjoy discounted combo bundles for screenings starting after 20:30.",
+  };
+  const tagMap = {
+    "Thong bao": "Announcement",
+    "Khuyen mai": "Promotion",
+    "Tin moi": "Update",
+  };
+
+  return {
+    ...item,
+    title: titleMap[item.title] || item.title || "Latest campaign",
+    summary: summaryMap[item.summary] || item.summary || "Fresh editorial updates will appear here.",
+    tag: tagMap[item.tag] || item.tag || "Update",
+  };
+}
+
 function renderMemberPage() {
   const signedIn = state.session.authenticated;
   const user = state.session.user || {};
 
   el.mainContent.innerHTML = `
     <section class="section-card member-hero">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">Member</p>
-          <h2>Loyalty designed to feel premium, not cluttered</h2>
-        </div>
-        <span class="pill">${signedIn ? user.tier : "Guest Mode"}</span>
+      <div class="member-status-row">
+        <span class="pill ${tierClass(signedIn ? user.tier : "Guest Mode")}">${signedIn ? user.tier : "Guest Mode"}</span>
       </div>
       <div class="member-dashboard">
         <article class="member-card-main">
@@ -427,6 +438,15 @@ function renderMemberPage() {
       </div>
     </section>
   `;
+}
+
+function tierClass(tier) {
+  const value = String(tier || "").toLowerCase();
+  if (value.includes("platinum")) return "tier-platinum";
+  if (value.includes("gold")) return "tier-gold";
+  if (value.includes("silver")) return "tier-silver";
+  if (value.includes("guest")) return "tier-guest";
+  return "tier-default";
 }
 
 function renderBookingPage() {

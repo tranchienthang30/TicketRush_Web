@@ -390,24 +390,24 @@ public final class DataStore {
     }
 
     private void seed() {
-        seedShow("Mua Tren Tang Thu 9", "Phim dang chieu", "Starlight Downtown", "#f97316", "Tam ly - tinh cam voi suat chieu toi va flash sale ghe VIP.", Instant.now().plus(Duration.ofDays(2)), List.of(
+        seedShow("Rain on the Ninth Floor", "Now Showing", "Starlight Downtown", "#f97316", "An intimate late-night romance built for premium seating and high-demand booking windows.", Instant.now().plus(Duration.ofDays(2)), List.of(
             zone("VIP", "VIP Hall", 4, 8, 160_000),
             zone("STD", "Standard Hall", 8, 14, 95_000),
             zone("BAL", "Balcony", 5, 12, 55_000)
         ));
-        seedShow("Tram Ga Cuoi Cung", "Phim dang chieu", "Starlight Riverside", "#ef4444", "Hanh dong - giat gan voi lich chieu toi uu cho dat ve online.", Instant.now().plus(Duration.ofDays(3)), List.of(
+        seedShow("Last Platform", "Now Showing", "Starlight Riverside", "#ef4444", "A tense action thriller timed for prime-time demand and rapid online seat selection.", Instant.now().plus(Duration.ofDays(3)), List.of(
             zone("VIP", "Premier Hall", 3, 8, 170_000),
             zone("STD", "Main Hall", 8, 15, 98_000),
             zone("ECO", "Eco Hall", 5, 10, 50_000)
         ));
-        seedShow("Hanh Tinh Kem Dua", "Phim sap chieu", "Starlight West Lake", "#8b5cf6", "Hoat hinh gia dinh voi combo ghe nhom va dashboard realtime.", Instant.now().plus(Duration.ofDays(7)), List.of(
+        seedShow("Candy Planet", "Coming Soon", "Starlight West Lake", "#8b5cf6", "A family animation built around group seating, snack bundles, and real-time availability.", Instant.now().plus(Duration.ofDays(7)), List.of(
             zone("VIP", "Family Box", 3, 6, 150_000),
             zone("STD", "Rainbow Hall", 7, 12, 78_000),
             zone("BAL", "Sky Deck", 4, 10, 48_000)
         ));
-        news.add(Map.of("title", "Mo them cum rap Riverside", "summary", "Cum rap moi voi phong chieu 4K va ghe doi.", "tag", "Thong bao"));
-        news.add(Map.of("title", "Tuan le member day", "summary", "Nhan gap doi diem cho don dat ve qua web.", "tag", "Khuyen mai"));
-        news.add(Map.of("title", "Gio vang bap nuoc", "summary", "Giam gia combo cho suat chieu sau 20:30.", "tag", "Tin moi"));
+        news.add(Map.of("title", "Riverside cinema expansion is now open", "summary", "A new branch with 4K projection, couple seats, and a faster online booking lane.", "tag", "Announcement"));
+        news.add(Map.of("title", "Member Week is live", "summary", "Earn double reward points on confirmed web bookings throughout the campaign.", "tag", "Promotion"));
+        news.add(Map.of("title", "Late-show snack hour", "summary", "Enjoy discounted combo bundles for screenings starting after 20:30.", "tag", "Update"));
         User demo = new User();
         demo.id = userSeq.getAndIncrement();
         demo.name = "Demo Member";

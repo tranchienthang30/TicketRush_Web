@@ -47,6 +47,14 @@ p { margin: 0; }
   flex-wrap: wrap;
   align-items: center;
 }
+.section-heading {
+  justify-content: space-between;
+}
+.section-heading > div {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
 .brand-block { gap: 14px; }
 .brand-mark {
   width: 52px;
@@ -117,6 +125,32 @@ p { margin: 0; }
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   color: #e2e8f0;
+}
+.tier-default {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+}
+.tier-guest {
+  background: rgba(59, 130, 246, 0.14);
+  color: #dbeafe;
+  border: 1px solid rgba(96, 165, 250, 0.24);
+}
+.tier-silver {
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.22), rgba(226, 232, 240, 0.12));
+  color: #f8fafc;
+  border: 1px solid rgba(203, 213, 225, 0.24);
+}
+.tier-gold {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.26), rgba(251, 191, 36, 0.14));
+  color: #fff7d6;
+  border: 1px solid rgba(251, 191, 36, 0.26);
+  box-shadow: inset 0 1px 0 rgba(255, 244, 200, 0.12);
+}
+.tier-platinum {
+  background: linear-gradient(135deg, rgba(226, 232, 240, 0.24), rgba(148, 163, 184, 0.12));
+  color: #f8fafc;
+  border: 1px solid rgba(226, 232, 240, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 .content-column { display: grid; gap: 18px; }
 .page-banner {
@@ -250,6 +284,26 @@ p { margin: 0; }
     radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), transparent 28%),
     linear-gradient(180deg, rgba(18, 26, 49, 0.98), rgba(12, 18, 35, 0.98));
 }
+.member-status-row {
+  display: flex;
+  justify-content: flex-start;
+}
+.member-status-row .pill {
+  flex: 0 0 auto;
+}
+.pricing-hero .section-heading,
+.news-hero .section-heading,
+.member-hero .section-heading {
+  align-items: flex-start;
+  gap: 18px;
+}
+.pricing-hero .section-heading .pill,
+.news-hero .section-heading .pill,
+.member-hero .section-heading .pill {
+  align-self: flex-start;
+  flex: 0 0 auto;
+  margin-top: 6px;
+}
 .pricing-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -306,6 +360,9 @@ p { margin: 0; }
 }
 .news-feature {
   padding: 24px;
+  min-height: 150px;
+  display: grid;
+  align-content: end;
   border-radius: 24px;
   background:
     linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(245, 158, 11, 0.14)),
@@ -314,28 +371,27 @@ p { margin: 0; }
 }
 .news-grid {
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
+  align-items: stretch;
 }
 .news-card {
-  grid-column: span 4;
   display: grid;
   gap: 14px;
+  min-height: 310px;
   padding: 22px;
+  align-content: start;
   border-radius: 24px;
   border: 1px solid rgba(255,255,255,0.08);
   background:
     linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)),
     linear-gradient(180deg, rgba(15, 23, 48, 0.92), rgba(9, 14, 28, 0.96));
 }
-.news-card-large {
-  grid-column: span 6;
-  min-height: 260px;
-  align-content: end;
-  background:
-    radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), transparent 34%),
-    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)),
-    linear-gradient(180deg, rgba(15, 23, 48, 0.92), rgba(9, 14, 28, 0.98));
+.news-card .muted {
+  line-height: 1.65;
+}
+.news-card .inline-link {
+  margin-top: auto;
 }
 .tag-pill {
   width: fit-content;
@@ -466,9 +522,20 @@ textarea { min-height: 110px; resize: vertical; }
 .dialog-actions > * { flex: 0 0 auto; }
 @media (max-width: 1120px) {
   .page-grid, .hero-card, .booking-layout, .promo-grid, .movie-grid, .stat-grid, .member-layout, .pricing-grid, .member-dashboard { grid-template-columns: 1fr; }
-  .news-card, .news-card-large { grid-column: span 12; }
+  .news-grid { grid-template-columns: 1fr; }
   .site-header { grid-template-columns: 1fr; }
   .main-nav { justify-content: flex-start; }
+  .pricing-hero .section-heading,
+  .news-hero .section-heading,
+  .member-hero .section-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .pricing-hero .section-heading .pill,
+  .news-hero .section-heading .pill,
+  .member-hero .section-heading .pill {
+    margin-top: 0;
+  }
 }
 @media (max-width: 720px) {
   .page-shell { width: min(100% - 18px, 1440px); margin: 10px auto 24px; }
