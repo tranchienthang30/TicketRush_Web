@@ -30,13 +30,19 @@ const el = {
 };
 
 const fmtMoney = (cents) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(cents);
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(cents);
+
 const fmtTime = (value) =>
-  new Date(value).toLocaleString("vi-VN", { hour12: false, dateStyle: "medium", timeStyle: "short" });
+  new Date(value).toLocaleString("en-GB", { hour12: false, dateStyle: "medium", timeStyle: "short" });
 
 async function api(path, options = {}) {
-  const headers = { "Content-Type": "application/json", "X-Client-Id": state.clientId, ...(options.headers || {}) };
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Client-Id": state.clientId,
+    ...(options.headers || {}),
+  };
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
+
   const res = await fetch(path, { ...options, headers });
   const data = await res.json();
   if (!res.ok || data.error) throw new Error(data.error || "Request failed");
@@ -70,7 +76,10 @@ function renderShell() {
 
 function renderAuthButtons() {
   if (state.session.authenticated) {
-    el.authActions.innerHTML = `<span class="pill">${state.session.user.name}</span><button class="ghost-button" id="logout-btn">Đăng xuất</button>`;
+    el.authActions.innerHTML = `
+      <span class="pill">${state.session.user.name}</span>
+      <button class="ghost-button" id="logout-btn">Sign Out</button>
+    `;
     document.querySelector("#logout-btn").addEventListener("click", async () => {
       state.token = "";
       localStorage.removeItem("ticketrush-token");
@@ -78,26 +87,58 @@ function renderAuthButtons() {
     });
     return;
   }
-  el.authActions.innerHTML = `<button class="text-button" id="open-login">Đăng nhập</button><button class="primary-button" id="open-register">Đăng ký</button>`;
+
+  el.authActions.innerHTML = `
+    <button class="text-button" id="open-login">Sign In</button>
+    <button class="primary-button" id="open-register">Create Account</button>
+  `;
   document.querySelector("#open-login").addEventListener("click", () => el.loginDialog.showModal());
   document.querySelector("#open-register").addEventListener("click", () => el.registerDialog.showModal());
 }
 
 function renderMemberSummary() {
   if (!state.session.authenticated) {
-    el.memberSummary.innerHTML = `<article class="admin-card"><p class="eyebrow">Member</p><h3>Khách vãng lai</h3><p class="muted">Đăng nhập để lưu vé, tích điểm và xem lịch sử đơn hàng.</p></article>`;
+    el.memberSummary.innerHTML = `
+      <article class="admin-card">
+        <p class="eyebrow">Guest</p>
+        <h3>Not signed in yet</h3>
+        <p class="muted">Sign in to store tickets, track points, and unlock member perks.</p>
+      </article>
+    `;
     return;
   }
+
   const user = state.session.user;
-  el.memberSummary.innerHTML = `<article class="admin-card"><p class="eyebrow">Member</p><h3>${user.name}</h3><p class="muted">${user.email}</p><div class="quick-stats"><span class="mini-chip">${user.tier}</span><span class="mini-chip">${user.points} điểm</span></div></article>`;
+  el.memberSummary.innerHTML = `
+    <article class="admin-card">
+      <p class="eyebrow">Member Profile</p>
+      <h3>${user.name}</h3>
+      <p class="muted">${user.email}</p>
+      <div class="quick-stats">
+        <span class="mini-chip">${user.tier}</span>
+        <span class="mini-chip">${user.points} pts</span>
+      </div>
+    </article>
+  `;
 }
 
 function renderShowSidebar() {
   el.eventsPanel.innerHTML = state.catalog.shows
     .map(
-      (show) => `<article class="theater-card ${show.id === state.activeShowId ? "active-card" : ""}" data-show-id="${show.id}"><p class="eyebrow">${show.category}</p><h3>${show.venue}</h3><p class="muted">${show.title}</p><div class="quick-stats"><span class="mini-chip">${fmtTime(show.startTime)}</span><span class="mini-chip">Đã bán ${show.stats.soldSeats}/${show.stats.totalSeats}</span></div></article>`
+      (show) => `
+        <article class="theater-card ${show.id === state.activeShowId ? "active-card" : ""}" data-show-id="${show.id}">
+          <p class="eyebrow">${show.category}</p>
+          <h3>${show.venue}</h3>
+          <p class="muted">${show.title}</p>
+          <div class="quick-stats">
+            <span class="mini-chip">${fmtTime(show.startTime)}</span>
+            <span class="mini-chip">Sold ${show.stats.soldSeats}/${show.stats.totalSeats}</span>
+          </div>
+        </article>
+      `
     )
     .join("");
+
   [...el.eventsPanel.querySelectorAll("[data-show-id]")].forEach((card) =>
     card.addEventListener("click", async () => {
       state.activeShowId = Number(card.dataset.showId);
@@ -110,12 +151,38 @@ function renderShowSidebar() {
 
 function renderOrders() {
   if (!state.orders.length) {
-    el.ordersPanel.innerHTML = `<article class="ticket-card"><p class="muted">Chưa có đơn hàng nào cho suất chiếu đang chọn.</p></article>`;
+    el.ordersPanel.innerHTML = `
+      <article class="ticket-card">
+        <p class="muted">No orders yet for the currently selected show.</p>
+      </article>
+    `;
     return;
   }
+
   el.ordersPanel.innerHTML = state.orders
     .map(
-      (order) => `<article class="ticket-card"><h4>${order.eventTitle}</h4><p class="muted">${order.venue}</p><p class="muted">${fmtTime(order.startTime)}</p><p><strong>${order.totalLabel}</strong></p>${order.items.map((item) => `<div class="ticket-item"><div class="ticket-qr">${item.qrSvg}</div><div><h4>${item.seatKey}</h4><p class="muted">${item.zoneLabel} · ${item.priceLabel}</p><small>${item.qrPayload}</small></div></div>`).join("")}</article>`
+      (order) => `
+        <article class="ticket-card">
+          <h4>${order.eventTitle}</h4>
+          <p class="muted">${order.venue}</p>
+          <p class="muted">${fmtTime(order.startTime)}</p>
+          <p><strong>${order.totalLabel}</strong></p>
+          ${order.items
+            .map(
+              (item) => `
+                <div class="ticket-item">
+                  <div class="ticket-qr">${item.qrSvg}</div>
+                  <div>
+                    <h4>${item.seatKey}</h4>
+                    <p class="muted">${item.zoneLabel} / ${item.priceLabel}</p>
+                    <small>${item.qrPayload}</small>
+                  </div>
+                </div>
+              `
+            )
+            .join("")}
+        </article>
+      `
     )
     .join("");
 }
@@ -140,70 +207,398 @@ function renderHomePage() {
     <section class="hero-card" style="background: linear-gradient(135deg, ${show.heroColor}, rgba(15, 23, 48, 0.98)), linear-gradient(180deg, rgba(18, 26, 49, 0.96), rgba(12, 18, 35, 0.96));">
       <div class="hero-copy">
         <div>
-          <p class="eyebrow">Trang chủ</p>
+          <p class="eyebrow">Featured Show</p>
           <div class="hero-title">${show.title}</div>
         </div>
         <p class="hero-sub">${show.description}</p>
         <div class="meta-row">
           <span class="meta-pill">${show.venue}</span>
           <span class="meta-pill">${fmtTime(show.startTime)}</span>
-          <span class="meta-pill">Member, queue, khóa ghế</span>
+          <span class="meta-pill">Queue + Seat Locking</span>
         </div>
       </div>
       <div class="hero-poster">
         <p class="poster-kicker">${show.category}</p>
-        <h3>Từ trang chủ bạn có thể đi qua từng chức năng riêng biệt.</h3>
+        <h3>Move from the homepage into each dedicated cinema workflow with a single click.</h3>
       </div>
     </section>
     <section class="section-card">
-      <div class="section-heading"><div><p class="eyebrow">Điều hướng nhanh</p><h2>Chuyển qua từng trang chức năng</h2></div></div>
-      <div class="movie-grid">
-        ${quickCard("Phim", "/movies.html", "Danh sách phim đang chiếu và sắp chiếu")}
-        ${quickCard("Rạp", "/theaters.html", "Lịch chiếu theo cụm rạp")}
-        ${quickCard("Giá vé", "/pricing.html", "Bảng giá theo khu ghế")}
-        ${quickCard("Tin mới", "/news.html", "Thông báo và khuyến mãi")}
-        ${quickCard("Thành viên", "/member.html", "Đăng nhập, đăng ký, điểm thưởng")}
-        ${quickCard("Đặt vé", "/booking.html", "Queue, chọn ghế và checkout")}
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Quick Access</p>
+          <h2>Jump straight into the right experience</h2>
+        </div>
       </div>
-    </section>`;
+      <div class="movie-grid">
+        ${quickCard("Movies", "/movies.html", "Browse now showing and upcoming titles")}
+        ${quickCard("Theaters", "/theaters.html", "Explore branches and live showtimes")}
+        ${quickCard("Pricing", "/pricing.html", "Clear ticket tiers and seat class pricing")}
+        ${quickCard("News", "/news.html", "Campaigns, launches, and weekly offers")}
+        ${quickCard("Member", "/member.html", "Accounts, rewards, and loyalty benefits")}
+        ${quickCard("Booking", "/booking.html", "Queue entry, seat picking, and checkout")}
+      </div>
+    </section>
+  `;
 }
 
 function renderMoviesPage() {
-  el.mainContent.innerHTML = `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">Phim</p><h2>Đang chiếu và sắp chiếu</h2></div></div><div class="movie-grid">${state.catalog.shows.map((show) => `<article class="movie-card"><div class="movie-cover" style="background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.3)), linear-gradient(135deg, ${show.heroColor}, #0f172a);"></div><p class="eyebrow">${show.category}</p><h3>${show.title}</h3><p class="muted">${show.description}</p><div class="quick-stats"><span class="mini-chip">${show.venue}</span><span class="mini-chip">${fmtTime(show.startTime)}</span></div></article>`).join("")}</div></section>`;
+  el.mainContent.innerHTML = `
+    <section class="section-card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Movies</p>
+          <h2>Now showing and coming soon</h2>
+        </div>
+      </div>
+      <div class="movie-grid">
+        ${state.catalog.shows
+          .map(
+            (show) => `
+              <article class="movie-card">
+                <div class="movie-cover" style="background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.3)), linear-gradient(135deg, ${show.heroColor}, #0f172a);"></div>
+                <p class="eyebrow">${show.category}</p>
+                <h3>${show.title}</h3>
+                <p class="muted">${show.description}</p>
+                <div class="quick-stats">
+                  <span class="mini-chip">${show.venue}</span>
+                  <span class="mini-chip">${fmtTime(show.startTime)}</span>
+                </div>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
 }
 
 function renderTheatersPage() {
-  el.mainContent.innerHTML = `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">Rạp</p><h2>Lịch chiếu theo cụm rạp</h2></div></div><div class="movie-grid">${state.catalog.theaters.map((theater) => `<article class="movie-card"><p class="eyebrow">Cụm rạp</p><h3>${theater.name}</h3><div class="stack">${theater.movies.map((movie) => `<p class="muted">${movie.title} · ${fmtTime(movie.startTime)}</p>`).join("")}</div></article>`).join("")}</div></section>`;
+  el.mainContent.innerHTML = `
+    <section class="section-card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Theaters</p>
+          <h2>Branches and active sessions</h2>
+        </div>
+      </div>
+      <div class="movie-grid">
+        ${state.catalog.theaters
+          .map(
+            (theater) => `
+              <article class="movie-card">
+                <p class="eyebrow">Cinema Branch</p>
+                <h3>${theater.name}</h3>
+                <div class="stack">
+                  ${theater.movies.map((movie) => `<p class="muted">${movie.title} / ${fmtTime(movie.startTime)}</p>`).join("")}
+                </div>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
 }
 
 function renderPricingPage() {
-  el.mainContent.innerHTML = `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">Giá vé</p><h2>Bảng giá theo khu ghế</h2></div></div><div class="movie-grid">${state.catalog.pricing.map((price) => `<article class="movie-card"><p class="eyebrow">Bảng giá</p><h3>${price.label}</h3><p class="muted">Ngày thường: ${price.weekday} VND</p><p class="muted">Cuối tuần: ${price.weekend} VND</p></article>`).join("")}</div></section>`;
+  el.mainContent.innerHTML = `
+    <section class="section-card pricing-hero">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Pricing</p>
+          <h2>Simple, readable pricing without hidden surprises</h2>
+        </div>
+        <span class="pill">Updated for this season</span>
+      </div>
+      <p class="lead-copy">Choose the seat class that fits the occasion, then match it with your preferred session time. Weekend uplift is stated upfront so the final ticket price feels clear, consistent, and easy to trust.</p>
+      <div class="pricing-grid">
+        ${state.catalog.pricing
+          .map(
+            (price, index) => `
+              <article class="pricing-card ${index === 0 ? "pricing-card-featured" : ""}">
+                <p class="eyebrow">Seat Class</p>
+                <h3>${price.label}</h3>
+                <div class="price-stack">
+                  <div class="price-row">
+                    <span>Weekday</span>
+                    <strong>${price.weekday} VND</strong>
+                  </div>
+                  <div class="price-row">
+                    <span>Weekend</span>
+                    <strong>${price.weekend} VND</strong>
+                  </div>
+                </div>
+                <p class="muted">${index === 0 ? "Best for premium viewing, couples, and marquee openings." : index === 1 ? "Balanced comfort for regular movie nights." : "A practical pick for casual sessions and groups."}</p>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
 }
 
 function renderNewsPage() {
-  el.mainContent.innerHTML = `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">Tin mới</p><h2>Khuyến mãi và thông báo</h2></div></div><div class="movie-grid">${state.catalog.news.map((item) => `<article class="movie-card"><p class="eyebrow">${item.tag}</p><h3>${item.title}</h3><p class="muted">${item.summary}</p></article>`).join("")}</div></section>`;
+  el.mainContent.innerHTML = `
+    <section class="section-card news-hero">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">News</p>
+          <h2>Fresh launches, promos, and cinema updates</h2>
+        </div>
+        <span class="pill">Editorial Feed</span>
+      </div>
+      <div class="news-feature">
+        <div>
+          <p class="eyebrow">Featured Story</p>
+          <h3>${state.catalog.news[0]?.title || "Latest campaign"}</h3>
+          <p class="lead-copy">${state.catalog.news[0]?.summary || "Return here for weekly launches, curated offers, and fresh editorial highlights from across the circuit."}</p>
+        </div>
+      </div>
+      <div class="news-grid">
+        ${state.catalog.news
+          .map(
+            (item, index) => `
+              <article class="news-card ${index === 0 ? "news-card-large" : ""}">
+                <span class="tag-pill">${item.tag}</span>
+                <h3>${item.title}</h3>
+                <p class="muted">${item.summary}</p>
+                <a href="/booking.html" class="inline-link">Open booking</a>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
 }
 
 function renderMemberPage() {
-  el.mainContent.innerHTML = `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">Thành viên</p><h2>Đăng nhập, đăng ký, điểm thưởng</h2></div></div><div class="member-layout"><article class="admin-card">${state.session.authenticated ? `<p class="eyebrow">Thông tin</p><h3>${state.session.user.name}</h3><p class="muted">${state.session.user.email}</p><div class="quick-stats"><span class="mini-chip">${state.session.user.tier}</span><span class="mini-chip">${state.session.user.points} điểm</span></div><p class="muted">Mỗi checkout thành công sẽ cộng thêm điểm vào tài khoản.</p>` : `<p class="eyebrow">Khách</p><h3>Chưa đăng nhập</h3><p class="muted">Mở popup đăng nhập / đăng ký từ thanh điều hướng phía trên để sử dụng member points.</p><div class="quick-stats"><span class="mini-chip">Tài khoản demo</span><span class="mini-chip">member@starlightrush.vn / 123456</span></div>`}</article><article class="admin-card"><p class="eyebrow">Lịch sử đơn hàng</p><div class="stack">${state.orders.length ? state.orders.map((order) => `<p class="muted">${order.eventTitle} · ${order.totalLabel}</p>`).join("") : "<p class='muted'>Chưa có đơn hàng nào.</p>"}</div></article></div></section>`;
+  const signedIn = state.session.authenticated;
+  const user = state.session.user || {};
+
+  el.mainContent.innerHTML = `
+    <section class="section-card member-hero">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Member</p>
+          <h2>Loyalty designed to feel premium, not cluttered</h2>
+        </div>
+        <span class="pill">${signedIn ? user.tier : "Guest Mode"}</span>
+      </div>
+      <div class="member-dashboard">
+        <article class="member-card-main">
+          <p class="eyebrow">${signedIn ? "Account Overview" : "Welcome"}</p>
+          <h3>${signedIn ? user.name : "Join the Starlight Rush club"}</h3>
+          <p class="muted">${signedIn ? user.email : "Create an account to track points, retain ticket history, and unlock exclusive booking perks."}</p>
+          <div class="member-stat-row">
+            <div class="member-stat">
+              <span>Tier</span>
+              <strong>${signedIn ? user.tier : "Guest"}</strong>
+            </div>
+            <div class="member-stat">
+              <span>Points</span>
+              <strong>${signedIn ? user.points : 0}</strong>
+            </div>
+          </div>
+        </article>
+        <article class="member-card-side">
+          <p class="eyebrow">Benefits</p>
+          <div class="stack">
+            <p class="muted">Priority booking profile autofill.</p>
+            <p class="muted">Reward points after successful checkout.</p>
+            <p class="muted">Ticket history pinned to your account.</p>
+          </div>
+        </article>
+      </div>
+      <div class="member-layout">
+        <article class="admin-card">
+          <p class="eyebrow">Order History</p>
+          <div class="stack">
+            ${state.orders.length ? state.orders.map((order) => `<p class="muted">${order.eventTitle} / ${order.totalLabel}</p>`).join("") : "<p class='muted'>No purchases yet.</p>"}
+          </div>
+        </article>
+        <article class="admin-card">
+          <p class="eyebrow">Demo Access</p>
+          <p class="muted">Email: <strong>member@starlightrush.vn</strong></p>
+          <p class="muted">Password: <strong>123456</strong></p>
+          <p class="muted">Use the header buttons to sign in or create a new account in the modal flow.</p>
+        </article>
+      </div>
+    </section>
+  `;
 }
 
 function renderBookingPage() {
   startPolling();
   const { queue, zones = [], seats = [], selection = {}, show } = state.detail;
+
   if (queue.state === "waiting") {
-    el.mainContent.innerHTML = `<section class="section-card"><article class="queue-card"><p class="eyebrow">Virtual Queue</p><h3>Bạn đang ở phòng chờ</h3><p>Vị trí hiện tại: <strong>${queue.position}</strong></p><p class="muted">Hệ thống sẽ cho vào theo từng đợt. Không cần tải lại trang.</p></article></section>`;
+    el.mainContent.innerHTML = `
+      <section class="section-card">
+        <article class="queue-card">
+          <p class="eyebrow">Virtual Queue</p>
+          <h3>You are currently in the waiting room</h3>
+          <p>Current position: <strong>${queue.position}</strong></p>
+          <p class="muted">You will be admitted in controlled batches. Please keep this page open.</p>
+        </article>
+      </section>
+    `;
     return;
   }
-  el.mainContent.innerHTML = `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">Đặt vé</p><h2>Queue, chọn ghế, checkout</h2></div><div class="meta-row"><span class="meta-pill">${show.venue}</span><span class="meta-pill">${fmtTime(show.startTime)}</span></div></div><section class="booking-layout"><div class="booking-card"><div class="screen">Screen</div><div class="legend"><span class="mini-chip">Xanh: còn trống</span><span class="mini-chip">Vàng: ghế của bạn</span><span class="mini-chip">Xám: đã khóa / đã bán</span></div><div class="zone-grid">${zones.map((zone) => { const zoneSeats = seats.filter((seat) => seat.zoneCode === zone.code); const rows = [...new Set(zoneSeats.map((seat) => seat.rowLabel))]; return `<article class="theater-card"><div class="section-heading"><div><p class="eyebrow">${zone.code}</p><h3>${zone.label}</h3></div><span class="pill">${zone.priceLabel}</span></div><div class="seat-grid">${rows.map((row) => { const rowSeats = zoneSeats.filter((seat) => seat.rowLabel === row); return `<div class="seat-row"><span class="row-label">${row}</span>${rowSeats.map((seat) => { const cls = seat.status === "sold" ? "sold" : seat.isMine ? "mine" : seat.status === "locked" ? "locked" : "available"; const disabled = seat.status === "sold" || (seat.status === "locked" && !seat.isMine); return `<button class="seat ${cls}" data-seat-id="${seat.id}" ${disabled ? "disabled" : ""} title="${seat.seatKey} - ${seat.priceLabel}"></button>`; }).join("")}</div>`; }).join("")}</div></article>`; }).join("")}</div></div><div class="stack"><article class="booking-card"><p class="eyebrow">Đơn hàng</p><h3>${show.title}</h3><p class="muted">${selection.count || 0} ghế đang được giữ.</p><p><strong>${fmtMoney(selection.totalCents || 0)}</strong></p><p class="muted">Hết hạn: ${selection.expiresAt ? fmtTime(selection.expiresAt) : "chưa có"}</p><button class="primary-button" id="checkout-btn" ${selection.count ? "" : "disabled"}>Thanh toán</button></article></div></section></section>`;
-  [...document.querySelectorAll("[data-seat-id]")].forEach((button) => button.addEventListener("click", async () => { const seatId = Number(button.dataset.seatId); const mine = seats.filter((seat) => seat.isMine).map((seat) => seat.id); const next = mine.includes(seatId) ? mine.filter((id) => id !== seatId) : [...mine, seatId]; await api(`/api/shows/${state.activeShowId}/hold`, { method: "POST", body: JSON.stringify({ seatIds: next }) }); await refresh(); }));
-  document.querySelector("#checkout-btn")?.addEventListener("click", () => { if (state.session.authenticated) { el.checkoutForm.email.value = state.session.user.email; el.checkoutForm.name.value = state.session.user.name; } el.checkoutDialog.showModal(); });
+
+  el.mainContent.innerHTML = `
+    <section class="section-card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Booking</p>
+          <h2>Queue, seat picking, and checkout</h2>
+        </div>
+        <div class="meta-row">
+          <span class="meta-pill">${show.venue}</span>
+          <span class="meta-pill">${fmtTime(show.startTime)}</span>
+        </div>
+      </div>
+      <section class="booking-layout">
+        <div class="booking-card">
+          <div class="screen">Screen</div>
+          <div class="legend">
+            <span class="mini-chip">Green: available</span>
+            <span class="mini-chip">Gold: yours</span>
+            <span class="mini-chip">Gray: locked / sold</span>
+          </div>
+          <div class="zone-grid">
+            ${zones
+              .map((zone) => {
+                const zoneSeats = seats.filter((seat) => seat.zoneCode === zone.code);
+                const rows = [...new Set(zoneSeats.map((seat) => seat.rowLabel))];
+                return `
+                  <article class="theater-card">
+                    <div class="section-heading">
+                      <div>
+                        <p class="eyebrow">${zone.code}</p>
+                        <h3>${zone.label}</h3>
+                      </div>
+                      <span class="pill">${zone.priceLabel}</span>
+                    </div>
+                    <div class="seat-grid">
+                      ${rows
+                        .map((row) => {
+                          const rowSeats = zoneSeats.filter((seat) => seat.rowLabel === row);
+                          return `
+                            <div class="seat-row">
+                              <span class="row-label">${row}</span>
+                              ${rowSeats
+                                .map((seat) => {
+                                  const cls = seat.status === "sold" ? "sold" : seat.isMine ? "mine" : seat.status === "locked" ? "locked" : "available";
+                                  const disabled = seat.status === "sold" || (seat.status === "locked" && !seat.isMine);
+                                  return `<button class="seat ${cls}" data-seat-id="${seat.id}" ${disabled ? "disabled" : ""} title="${seat.seatKey} - ${seat.priceLabel}"></button>`;
+                                })
+                                .join("")}
+                            </div>
+                          `;
+                        })
+                        .join("")}
+                    </div>
+                  </article>
+                `;
+              })
+              .join("")}
+          </div>
+        </div>
+        <div class="stack">
+          <article class="booking-card">
+            <p class="eyebrow">Order</p>
+            <h3>${show.title}</h3>
+            <p class="muted">${selection.count || 0} seats currently locked for you.</p>
+            <p><strong>${fmtMoney(selection.totalCents || 0)}</strong></p>
+            <p class="muted">Expires at: ${selection.expiresAt ? fmtTime(selection.expiresAt) : "not started"}</p>
+            <button class="primary-button" id="checkout-btn" ${selection.count ? "" : "disabled"}>Proceed to payment</button>
+          </article>
+        </div>
+      </section>
+    </section>
+  `;
+
+  [...document.querySelectorAll("[data-seat-id]")].forEach((button) =>
+    button.addEventListener("click", async () => {
+      const seatId = Number(button.dataset.seatId);
+      const mine = seats.filter((seat) => seat.isMine).map((seat) => seat.id);
+      const next = mine.includes(seatId) ? mine.filter((id) => id !== seatId) : [...mine, seatId];
+      await api(`/api/shows/${state.activeShowId}/hold`, { method: "POST", body: JSON.stringify({ seatIds: next }) });
+      await refresh();
+    })
+  );
+
+  document.querySelector("#checkout-btn")?.addEventListener("click", () => {
+    if (state.session.authenticated) {
+      el.checkoutForm.email.value = state.session.user.email;
+      el.checkoutForm.name.value = state.session.user.name;
+    }
+    el.checkoutDialog.showModal();
+  });
 }
 
 function renderAdminPage() {
   stopPolling();
-  el.mainContent.innerHTML = `<section class="section-card"><div class="section-heading"><div><p class="eyebrow">Admin</p><h2>Dashboard và tạo suất chiếu</h2></div></div><div class="stat-grid">${state.dashboard.events.map((event) => `<article class="stat-card"><p class="eyebrow">${new Date(event.startTime).toLocaleDateString("vi-VN")}</p><h3>${event.title}</h3><p><strong>${event.revenueLabel}</strong></p><p class="muted">Bán ${event.soldSeats}/${event.totalSeats} ghế · lock ${event.lockedSeats} · lấp đầy ${event.fillRate}%</p></article>`).join("")}</div><div class="member-layout"><article class="admin-card"><p class="eyebrow">Audience Stats</p><div class="stack">${state.dashboard.audience.length ? state.dashboard.audience.map((item) => `<p>${item.gender} / ${item.ageBucket}: <strong>${item.count}</strong></p>`).join("") : "<p class='muted'>Chưa có dữ liệu.</p>"}</div></article><article class="admin-card"><p class="eyebrow">Tạo suất chiếu</p><form id="admin-form" class="stack"><input name="title" placeholder="Tên phim" required /><input name="category" placeholder="Danh mục" value="Phim đang chiếu" required /><input name="venue" placeholder="Cụm rạp" required /><input name="startTime" type="datetime-local" required /><input name="heroColor" value="#0ea5e9" required /><textarea name="description" placeholder="Mô tả ngắn" required></textarea><button class="primary-button" type="submit">Tạo suất chiếu</button></form></article></div></section>`;
-  document.querySelector("#admin-form")?.addEventListener("submit", async (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const payload = Object.fromEntries(form.entries()); payload.startTime = new Date(payload.startTime).toISOString(); payload.zones = [{ code: "VIP", label: "VIP Hall", rowsCount: 4, seatsPerRow: 8, priceCents: 160000 }, { code: "STD", label: "Standard Hall", rowsCount: 8, seatsPerRow: 14, priceCents: 95000 }, { code: "BAL", label: "Balcony", rowsCount: 4, seatsPerRow: 10, priceCents: 55000 }]; await api("/api/admin/shows", { method: "POST", body: JSON.stringify(payload) }); await bootstrap(); });
+  el.mainContent.innerHTML = `
+    <section class="section-card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Admin</p>
+          <h2>Revenue, occupancy, and launch controls</h2>
+        </div>
+      </div>
+      <div class="stat-grid">
+        ${state.dashboard.events
+          .map(
+            (event) => `
+              <article class="stat-card">
+                <p class="eyebrow">${new Date(event.startTime).toLocaleDateString("en-GB")}</p>
+                <h3>${event.title}</h3>
+                <p><strong>${event.revenueLabel}</strong></p>
+                <p class="muted">Sold ${event.soldSeats}/${event.totalSeats} seats / locked ${event.lockedSeats} / fill ${event.fillRate}%</p>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+      <div class="member-layout">
+        <article class="admin-card">
+          <p class="eyebrow">Audience Mix</p>
+          <div class="stack">
+            ${state.dashboard.audience.length ? state.dashboard.audience.map((item) => `<p>${item.gender} / ${item.ageBucket}: <strong>${item.count}</strong></p>`).join("") : "<p class='muted'>No audience data yet.</p>"}
+          </div>
+        </article>
+        <article class="admin-card">
+          <p class="eyebrow">Create New Session</p>
+          <form id="admin-form" class="stack">
+            <input name="title" placeholder="Movie title" required />
+            <input name="category" placeholder="Category" value="Now Showing" required />
+            <input name="venue" placeholder="Cinema branch" required />
+            <input name="startTime" type="datetime-local" required />
+            <input name="heroColor" value="#0ea5e9" required />
+            <textarea name="description" placeholder="Short description" required></textarea>
+            <button class="primary-button" type="submit">Create session</button>
+          </form>
+        </article>
+      </div>
+    </section>
+  `;
+
+  document.querySelector("#admin-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const payload = Object.fromEntries(form.entries());
+    payload.startTime = new Date(payload.startTime).toISOString();
+    payload.zones = [
+      { code: "VIP", label: "VIP Hall", rowsCount: 4, seatsPerRow: 8, priceCents: 160000 },
+      { code: "STD", label: "Standard Hall", rowsCount: 8, seatsPerRow: 14, priceCents: 95000 },
+      { code: "BAL", label: "Balcony", rowsCount: 4, seatsPerRow: 10, priceCents: 55000 },
+    ];
+    await api("/api/admin/shows", { method: "POST", body: JSON.stringify(payload) });
+    await bootstrap();
+  });
 }
 
 function currentShow() {
@@ -211,7 +606,13 @@ function currentShow() {
 }
 
 function quickCard(title, href, description) {
-  return `<a class="movie-card page-link-card" href="${href}"><p class="eyebrow">Trang</p><h3>${title}</h3><p class="muted">${description}</p></a>`;
+  return `
+    <a class="movie-card page-link-card" href="${href}">
+      <p class="eyebrow">Page</p>
+      <h3>${title}</h3>
+      <p class="muted">${description}</p>
+    </a>
+  `;
 }
 
 async function refresh() {
@@ -236,7 +637,9 @@ function stopPolling() {
   }
 }
 
-document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => button.closest("dialog").close()));
+document.querySelectorAll("[data-close-dialog]").forEach((button) =>
+  button.addEventListener("click", () => button.closest("dialog").close())
+);
 
 el.loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -262,7 +665,7 @@ el.checkoutForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
   const result = await api(`/api/shows/${state.activeShowId}/checkout`, { method: "POST", body: JSON.stringify(payload) });
-  if (result.pointsEarned) alert(`Thanh toán thành công. Bạn nhận thêm ${result.pointsEarned} điểm.`);
+  if (result.pointsEarned) alert(`Payment completed. You earned ${result.pointsEarned} points.`);
   el.checkoutDialog.close();
   event.currentTarget.reset();
   await bootstrap();

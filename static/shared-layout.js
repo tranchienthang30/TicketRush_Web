@@ -2,14 +2,14 @@ const shell = document.querySelector(".page-shell");
 const page = document.body.dataset.page || "home";
 
 const pageTitles = {
-  home: "Tổng quan nền tảng",
-  movies: "Danh sách phim",
-  theaters: "Lịch chiếu theo rạp",
-  pricing: "Bảng giá vé",
-  news: "Tin mới và khuyến mãi",
-  member: "Thành viên và điểm thưởng",
-  booking: "Chọn ghế và thanh toán",
-  admin: "Bảng điều khiển quản trị",
+  home: "Platform Overview",
+  movies: "Now Showing & Coming Soon",
+  theaters: "Theater Directory",
+  pricing: "Ticket Pricing",
+  news: "News & Promotions",
+  member: "Membership",
+  booking: "Seat Selection & Checkout",
+  admin: "Admin Dashboard",
 };
 
 shell.innerHTML = `
@@ -23,12 +23,12 @@ shell.innerHTML = `
     </div>
     <nav class="main-nav">
       ${navLink("Home", "/")}
-      ${navLink("Phim", "/movies.html")}
-      ${navLink("Rạp", "/theaters.html")}
-      ${navLink("Giá vé", "/pricing.html")}
-      ${navLink("Tin moi", "/news.html")}
-      ${navLink("Thành viên", "/member.html")}
-      ${navLink("Đặt vé", "/booking.html")}
+      ${navLink("Movies", "/movies.html")}
+      ${navLink("Theaters", "/theaters.html")}
+      ${navLink("Pricing", "/pricing.html")}
+      ${navLink("News", "/news.html")}
+      ${navLink("Member", "/member.html")}
+      ${navLink("Booking", "/booking.html")}
       ${navLink("Admin", "/admin.html")}
     </nav>
     <div class="auth-row" id="auth-actions"></div>
@@ -38,21 +38,21 @@ shell.innerHTML = `
     <aside class="sidebar-card">
       <div class="stack-lg">
         <section>
-          <p class="eyebrow">Phiên đặt vé</p>
+          <p class="eyebrow">Current Session</p>
           <div class="client-chip" id="client-chip"></div>
         </section>
         <section id="member-summary"></section>
         <section>
           <div class="section-heading">
-            <h3>Cụm rạp đang hoạt động</h3>
+            <h3>Active Cinemas</h3>
             <span class="pill">Live</span>
           </div>
           <div id="events-panel" class="stack"></div>
         </section>
         <section>
           <div class="section-heading">
-            <h3>Vé của tôi</h3>
-            <span class="pill">QR Ticket</span>
+            <h3>My Tickets</h3>
+            <span class="pill">QR Pass</span>
           </div>
           <div id="orders-panel" class="stack"></div>
         </section>
@@ -63,7 +63,7 @@ shell.innerHTML = `
       <section class="section-card page-banner">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Trang hiện tại</p>
+            <p class="eyebrow">Current Page</p>
             <h2>${pageTitles[page] || pageTitles.home}</h2>
           </div>
         </div>
@@ -74,45 +74,45 @@ shell.innerHTML = `
 
   <dialog id="login-dialog">
     <form id="login-form" class="checkout-form">
-      <h3>Đăng nhập</h3>
+      <h3>Sign In</h3>
       <label>Email <input name="email" type="email" placeholder="member@starlightrush.vn" required /></label>
-      <label>Mật khẩu <input name="password" type="password" placeholder="123456" required /></label>
+      <label>Password <input name="password" type="password" placeholder="123456" required /></label>
       <div class="dialog-actions">
-        <button type="button" class="ghost-button" data-close-dialog>Đóng</button>
-        <button type="submit" class="primary-button">Đăng nhập</button>
+        <button type="button" class="ghost-button" data-close-dialog>Close</button>
+        <button type="submit" class="primary-button">Sign In</button>
       </div>
     </form>
   </dialog>
 
   <dialog id="register-dialog">
     <form id="register-form" class="checkout-form">
-      <h3>Đăng ký</h3>
-      <label>Họ tên <input name="name" required /></label>
+      <h3>Create Account</h3>
+      <label>Full Name <input name="name" required /></label>
       <label>Email <input name="email" type="email" required /></label>
-      <label>Mật khẩu <input name="password" type="password" required /></label>
+      <label>Password <input name="password" type="password" required /></label>
       <div class="dialog-actions">
-        <button type="button" class="ghost-button" data-close-dialog>Đóng</button>
-        <button type="submit" class="primary-button">Tạo tài khoản</button>
+        <button type="button" class="ghost-button" data-close-dialog>Close</button>
+        <button type="submit" class="primary-button">Register</button>
       </div>
     </form>
   </dialog>
 
   <dialog id="checkout-dialog">
     <form id="checkout-form" class="checkout-form">
-      <h3>Xác nhận đơn hàng</h3>
-      <label>Họ tên <input name="name" required /></label>
+      <h3>Confirm Order</h3>
+      <label>Full Name <input name="name" required /></label>
       <label>Email <input name="email" type="email" required /></label>
-      <label>Tuổi <input name="age" type="number" min="10" max="99" required /></label>
-      <label>Giới tính
+      <label>Age <input name="age" type="number" min="10" max="99" required /></label>
+      <label>Gender
         <select name="gender" required>
-          <option value="Female">Nữ</option>
-          <option value="Male">Nam</option>
-          <option value="Other">Khác</option>
+          <option value="Female">Female</option>
+          <option value="Male">Male</option>
+          <option value="Other">Other</option>
         </select>
       </label>
       <div class="dialog-actions">
-        <button type="button" class="ghost-button" data-close-dialog>Đóng</button>
-        <button type="submit" class="primary-button">Xác nhận thanh toán</button>
+        <button type="button" class="ghost-button" data-close-dialog>Close</button>
+        <button type="submit" class="primary-button">Pay Now</button>
       </div>
     </form>
   </dialog>
