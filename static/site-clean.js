@@ -21,6 +21,10 @@ const el = {
   eventsPanel: document.querySelector("#events-panel"),
   ordersPanel: document.querySelector("#orders-panel"),
   mainContent: document.querySelector("#main-content"),
+  pageBannerTitle: document.querySelector("#page-banner-title"),
+  pageBannerSummary: document.querySelector("#page-banner-summary"),
+  pageBannerStats: document.querySelector("#page-banner-stats"),
+  pageBannerActions: document.querySelector("#page-banner-actions"),
   loginDialog: document.querySelector("#login-dialog"),
   registerDialog: document.querySelector("#register-dialog"),
   checkoutDialog: document.querySelector("#checkout-dialog"),
@@ -72,6 +76,7 @@ function renderShell() {
   renderMemberSummary();
   renderShowSidebar();
   renderOrders();
+  renderPageBanner();
 }
 
 function renderAuthButtons() {
@@ -201,6 +206,94 @@ function renderPage() {
   (renderers[page] || renderHomePage)();
 }
 
+function renderPageBanner() {
+  const show = currentShow();
+  const configs = {
+    home: {
+      title: "Platform Overview",
+      summary: "Use the homepage as your control surface for discovery, live sessions, and fast movement into each booking workflow.",
+      stats: [show?.venue, show ? fmtTime(show.startTime) : null, "Queue Enabled"],
+      actions: [
+        { href: "/booking.html", label: "Start booking", kind: "primary-button" },
+        { href: "/movies.html", label: "Browse movies", kind: "ghost-button" },
+      ],
+    },
+    pricing: {
+      title: "Ticket Pricing",
+      summary: "Review the pricing structure for each seat class, then move into the live seat map where the final ticket value is determined by the seat you actually lock.",
+      stats: [show?.title, show?.venue, show ? `From ${fmtMoney(minPriceCents(show))}` : null],
+      actions: [
+        { href: "/booking.html", label: "Open seat map", kind: "primary-button" },
+        { href: "/theaters.html", label: "Change cinema", kind: "ghost-button" },
+      ],
+    },
+    news: {
+      title: "News & Promotions",
+      summary: "Track the latest launches, member campaigns, and branch updates tied to your current cinema session.",
+      stats: [show?.venue, "Editorial feed", `${(state.catalog?.news || []).length} stories`],
+      actions: [
+        { href: "/booking.html", label: "Book now", kind: "primary-button" },
+      ],
+    },
+    member: {
+      title: "Membership",
+      summary: "See your tier, review ticket history, and move into checkout with a better reward profile already attached.",
+      stats: [
+        state.session.authenticated ? state.session.user?.tier : "Guest Mode",
+        state.session.authenticated ? `${state.session.user?.points || 0} pts` : "Sign in for rewards",
+        show?.venue,
+      ],
+      actions: state.session.authenticated
+        ? [{ href: "/booking.html", label: "Use member benefits", kind: "primary-button" }]
+        : [{ action: "login", label: "Sign in", kind: "primary-button" }],
+    },
+    movies: {
+      title: "Now Showing & Coming Soon",
+      summary: "Review the active line-up, compare release timing, and move into booking from the title that fits your night.",
+      stats: [`${state.catalog?.shows?.length || 0} titles`, show?.venue, show ? fmtTime(show.startTime) : null],
+      actions: [{ href: "/booking.html", label: "Go to booking", kind: "primary-button" }],
+    },
+    theaters: {
+      title: "Theater Directory",
+      summary: "Switch between active branches, compare schedules, and keep the current session synced across the rest of the site.",
+      stats: [`${state.catalog?.theaters?.length || 0} branches`, show?.venue, show ? fmtTime(show.startTime) : null],
+      actions: [{ href: "/booking.html", label: "Pick seats", kind: "primary-button" }],
+    },
+    booking: {
+      title: "Seat Selection & Checkout",
+      summary: "Live seat availability, lock timers, and checkout are all tied to the active session shown here.",
+      stats: [show?.title, show?.venue, show ? fmtTime(show.startTime) : null],
+      actions: [{ href: "/pricing.html", label: "View pricing", kind: "ghost-button" }],
+    },
+    admin: {
+      title: "Admin Dashboard",
+      summary: "Monitor sales, occupancy, and audience mix while controlling new launches from the same workspace.",
+      stats: [`${state.dashboard?.events?.length || 0} sessions`, "Live metrics", show?.venue],
+      actions: [{ href: "/booking.html", label: "Open customer flow", kind: "ghost-button" }],
+    },
+  };
+
+  const config = configs[page] || configs.home;
+  el.pageBannerTitle.textContent = config.title;
+  el.pageBannerSummary.textContent = config.summary;
+  el.pageBannerStats.innerHTML = config.stats.filter(Boolean).map((item) => `<span class="mini-chip">${item}</span>`).join("");
+  el.pageBannerActions.innerHTML = config.actions
+    .map((action, index) => {
+      if (action.action === "login") {
+        return `<button class="${action.kind}" data-banner-action="login">${action.label}</button>`;
+      }
+      return `<a class="${action.kind}" href="${action.href}" ${index > 0 ? "" : ""}>${action.label}</a>`;
+    })
+    .join("");
+
+  el.pageBannerActions.querySelector('[data-banner-action="login"]')?.addEventListener("click", () => el.loginDialog.showModal());
+}
+
+function minPriceCents(show = currentShow()) {
+  const prices = (show?.pricing || []).map((item) => Number(item.priceCents)).filter(Boolean);
+  return prices.length ? Math.min(...prices) : 0;
+}
+
 function renderHomePage() {
   const show = currentShow();
   el.mainContent.innerHTML = `
@@ -301,11 +394,14 @@ function renderTheatersPage() {
 }
 
 function renderPricingPage() {
+  const show = currentShow();
+  const pricing = show?.pricing || [];
+
   el.mainContent.innerHTML = `
     <section class="section-card pricing-hero">
-      <p class="lead-copy">Choose the seat class that fits the occasion, then match it with your preferred session time. Weekend uplift is stated upfront so the final ticket price feels clear, consistent, and easy to trust.</p>
+      <p class="lead-copy">Use this page as a clear pricing reference before entering the live seat map. Final checkout value is always calculated from the actual seats you choose in Booking.</p>
       <div class="pricing-grid">
-        ${state.catalog.pricing
+        ${pricing
           .map(
             (price, index) => `
               <article class="pricing-card ${index === 0 ? "pricing-card-featured" : ""}">
@@ -313,15 +409,12 @@ function renderPricingPage() {
                 <h3>${price.label}</h3>
                 <div class="price-stack">
                   <div class="price-row">
-                    <span>Weekday</span>
-                    <strong>${price.weekday} VND</strong>
-                  </div>
-                  <div class="price-row">
-                    <span>Weekend</span>
-                    <strong>${price.weekend} VND</strong>
+                    <span>Current show price</span>
+                    <strong>${price.priceLabel}</strong>
                   </div>
                 </div>
                 <p class="muted">${index === 0 ? "Best for premium viewing, couples, and marquee openings." : index === 1 ? "Balanced comfort for regular movie nights." : "A practical pick for casual sessions and groups."}</p>
+                <a class="primary-button pricing-select" href="/booking.html">Open seat map</a>
               </article>
             `
           )

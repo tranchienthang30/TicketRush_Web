@@ -67,12 +67,7 @@ public final class DataStore {
         return Map.of(
             "shows", shows.stream().map(this::showCard).toList(),
             "theaters", theaterCards(),
-            "news", news,
-            "pricing", List.of(
-                Map.of("label", "VIP Hall", "weekday", "160.000", "weekend", "190.000"),
-                Map.of("label", "Standard Hall", "weekday", "90.000", "weekend", "120.000"),
-                Map.of("label", "Balcony / Eco", "weekday", "55.000", "weekend", "75.000")
-            )
+            "news", news
         );
     }
 
@@ -367,6 +362,12 @@ public final class DataStore {
             "startTime", iso(show.startTime),
             "heroColor", show.heroColor,
             "description", show.description,
+            "pricing", show.zones.stream().map(zone -> Map.of(
+                "code", zone.code,
+                "label", zone.label,
+                "priceCents", zone.priceCents,
+                "priceLabel", money(zone.priceCents)
+            )).toList(),
             "stats", Map.of("totalSeats", show.seats.size(), "soldSeats", sold, "lockedSeats", locked, "fillRate", show.seats.isEmpty() ? 0 : Math.round((sold * 1000.0 / show.seats.size())) / 10.0)
         );
     }

@@ -64,8 +64,15 @@ shell.innerHTML = `
         <div class="section-heading">
           <div>
             <p class="eyebrow">Current Page</p>
-            <h2>${pageTitles[page] || pageTitles.home}</h2>
+            <h2 id="page-banner-title">${pageTitles[page] || pageTitles.home}</h2>
           </div>
+        </div>
+        <div class="page-banner-body">
+          <div class="page-banner-copy">
+            <p class="muted" id="page-banner-summary"></p>
+            <div class="quick-stats" id="page-banner-stats"></div>
+          </div>
+          <div class="page-banner-actions" id="page-banner-actions"></div>
         </div>
       </section>
       <div id="main-content"></div>
