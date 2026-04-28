@@ -4,6 +4,8 @@ import java.nio.file.Path;
 
 public final class Main {
     public static void main(String[] args) throws Exception {
+
+        
         DataStore store = new DataStore();
         ServiceRuntime.start(9001, new AuthService(store)::handle);
         ServiceRuntime.start(9002, new CatalogService(store)::handle);
