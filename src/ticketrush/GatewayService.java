@@ -17,8 +17,7 @@ public final class GatewayService {
         try {
             String path = exchange.getRequestURI().getPath();
             if (!path.startsWith("/api/")) {
-                Path target = staticDir.resolve(path.equals("/") ? "home.html" : path.substring(1));
-                if (!target.toFile().exists()) target = staticDir.resolve("home.html");
+                Path target = resolveStaticTarget(path);
                 HttpUtil.file(exchange, target);
                 return;
             }
@@ -26,6 +25,21 @@ public final class GatewayService {
         } catch (Exception ex) {
             HttpUtil.json(exchange, 500, Map.of("error", ex.getMessage()));
         }
+    }
+
+    private Path resolveStaticTarget(String path) {
+        if ("/".equals(path)) return staticDir.resolve("html").resolve("home.html");
+
+        String relative = path.startsWith("/") ? path.substring(1) : path;
+        Path target = staticDir.resolve(relative);
+        if (target.toFile().exists()) return target;
+
+        if (relative.endsWith(".html")) {
+            Path htmlTarget = staticDir.resolve("html").resolve(relative);
+            if (htmlTarget.toFile().exists()) return htmlTarget;
+        }
+
+        return staticDir.resolve("html").resolve("home.html");
     }
 
     private void proxy(HttpExchange exchange, String path) throws IOException, InterruptedException {

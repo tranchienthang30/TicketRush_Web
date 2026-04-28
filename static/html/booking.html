@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Starlight Rush - Booking</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/css/cinema.css" />
+  </head>
+  <body data-page="booking">
+    <div class="page-shell">
+      <header class="site-header">
+        <div class="brand-block">
+          <div class="brand-mark">SR</div>
+          <div>
+            <p class="eyebrow">Microservices Cinema Platform</p>
+            <h1>Starlight Rush</h1>
+          </div>
+        </div>
+        <nav class="main-nav">
+          <a href="/">Home</a>
+          <a href="/movies.html">Movies</a>
+          <a href="/theaters.html">Theaters</a>
+          <a href="/pricing.html">Pricing</a>
+          <a href="/news.html">News</a>
+          <a href="/member.html">Member</a>
+          <a class="nav-active" href="/booking.html">Booking</a>
+          <a href="/admin.html">Admin</a>
+        </nav>
+        <div class="auth-row" id="auth-actions"></div>
+      </header>
+
+      <main class="page-grid">
+        <aside class="sidebar-card">
+          <div class="stack-lg">
+            <section>
+              <p class="eyebrow">Current Session</p>
+              <div class="client-chip" id="client-chip"></div>
+            </section>
+            <section id="member-summary"></section>
+            <section>
+              <div class="section-heading">
+                <h3>Active Cinemas</h3>
+                <span class="pill">Live</span>
+              </div>
+              <div id="events-panel" class="stack"></div>
+            </section>
+            <section>
+              <div class="section-heading">
+                <h3>My Tickets</h3>
+                <span class="pill">QR Pass</span>
+              </div>
+              <div id="orders-panel" class="stack"></div>
+            </section>
+          </div>
+        </aside>
+
+        <section class="content-column">
+          <section class="section-card page-banner">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Current Page</p>
+                <h2 id="page-banner-title">Seat Selection &amp; Checkout</h2>
+              </div>
+            </div>
+            <div class="page-banner-body">
+              <div class="page-banner-copy">
+                <p class="muted" id="page-banner-summary"></p>
+                <div class="quick-stats" id="page-banner-stats"></div>
+              </div>
+              <div class="page-banner-actions" id="page-banner-actions"></div>
+            </div>
+            <div class="page-banner-carousel">
+              <div class="page-banner-stage" id="page-banner-stage"></div>
+              <div class="page-banner-dots" id="page-banner-dots"></div>
+            </div>
+          </section>
+
+          <div id="main-content">
+            <section class="section-card hidden" id="booking-queue-section">
+              <article class="queue-card">
+                <p class="eyebrow">Virtual Queue</p>
+                <h3>You are currently in the waiting room</h3>
+                <p>Current position: <strong id="booking-queue-position"></strong></p>
+                <p class="muted">You will be admitted in controlled batches. Please keep this page open.</p>
+              </article>
+            </section>
+
+            <section class="section-card hidden" id="booking-main-section">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Booking</p>
+                  <h2>Queue, seat picking, and checkout</h2>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-pill" id="booking-venue"></span>
+                  <span class="meta-pill" id="booking-start-time"></span>
+                </div>
+              </div>
+              <section class="booking-layout">
+                <div class="booking-card">
+                  <div class="screen">Screen</div>
+                  <div class="legend">
+                    <span class="mini-chip">Green: available</span>
+                    <span class="mini-chip">Gold: yours</span>
+                    <span class="mini-chip">Gray: locked / sold</span>
+                  </div>
+                  <div class="zone-grid" id="booking-zone-grid"></div>
+                </div>
+                <div class="stack">
+                  <article class="booking-card">
+                    <p class="eyebrow">Order</p>
+                    <h3 id="booking-show-title"></h3>
+                    <p class="muted" id="booking-selection-count"></p>
+                    <p><strong id="booking-selection-total"></strong></p>
+                    <p class="muted" id="booking-selection-expires"></p>
+                    <button class="primary-button" id="checkout-btn" disabled>Proceed to payment</button>
+                  </article>
+                </div>
+              </section>
+            </section>
+          </div>
+        </section>
+      </main>
+
+      <dialog id="login-dialog">
+        <form id="login-form" class="checkout-form">
+          <h3>Sign In</h3>
+          <label>Email <input name="email" type="email" placeholder="member@starlightrush.vn" required /></label>
+          <label>Password <input name="password" type="password" placeholder="123456" required /></label>
+          <div class="dialog-actions">
+            <button type="button" class="ghost-button" data-close-dialog>Close</button>
+            <button type="submit" class="primary-button">Sign In</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="register-dialog">
+        <form id="register-form" class="checkout-form">
+          <h3>Create Account</h3>
+          <label>Full Name <input name="name" required /></label>
+          <label>Email <input name="email" type="email" required /></label>
+          <label>Password <input name="password" type="password" required /></label>
+          <div class="dialog-actions">
+            <button type="button" class="ghost-button" data-close-dialog>Close</button>
+            <button type="submit" class="primary-button">Register</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="checkout-dialog">
+        <form id="checkout-form" class="checkout-form">
+          <h3>Confirm Order</h3>
+          <label>Full Name <input name="name" required /></label>
+          <label>Email <input name="email" type="email" required /></label>
+          <label>Age <input name="age" type="number" min="10" max="99" required /></label>
+          <label>Gender
+            <select name="gender" required>
+              <option value="Female">Female</option>
+              <option value="Male">Male</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+          <div class="dialog-actions">
+            <button type="button" class="ghost-button" data-close-dialog>Close</button>
+            <button type="submit" class="primary-button">Pay Now</button>
+          </div>
+        </form>
+      </dialog>
+    </div>
+    <script src="/js/booking-page.js" type="module"></script>
+  </body>
+</html>

@@ -11,6 +11,7 @@ Ban microservices Java cho web dat ve xem phim `Starlight Rush`.
 - Admin service: `9004`
 - Backend da tach class/service rieng: `GatewayService`, `AuthService`, `CatalogService`, `BookingService`, `AdminService`
 - Frontend da tach theo trang: moi trang co HTML rieng va file JS entry rieng
+- Cau truc frontend: `static/html`, `static/css`, `static/js`
 
 ## Chuc nang
 
