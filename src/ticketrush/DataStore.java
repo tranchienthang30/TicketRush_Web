@@ -37,7 +37,7 @@ public final class DataStore {
 
     public synchronized Map<String, Object> register(Map<String, Object> body) {
         String email = str(body.get("email")).toLowerCase();
-        if (usersByEmail.containsKey(email)) throw new IllegalArgumentException("Email da ton tai");
+        if (usersByEmail.containsKey(email)) throw new IllegalArgumentException("Email already exists");
         User user = new User();
         user.id = userSeq.getAndIncrement();
         user.name = str(body.get("name"));
@@ -52,7 +52,7 @@ public final class DataStore {
     public synchronized Map<String, Object> login(Map<String, Object> body) {
         User user = usersByEmail.get(str(body.get("email")).toLowerCase());
         if (user == null || !user.password.equals(str(body.get("password")))) {
-            throw new IllegalArgumentException("Sai email hoac mat khau");
+            throw new IllegalArgumentException("Invalid email or password");
         }
         return auth(user, issueToken(user));
     }

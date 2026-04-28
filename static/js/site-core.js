@@ -368,38 +368,239 @@ function bindGlobalHandlers() {
   if (handlersBound) return;
   handlersBound = true;
 
+  // Close dialogs
   document.querySelectorAll("[data-close-dialog]").forEach((button) =>
     button.addEventListener("click", () => button.closest("dialog").close())
   );
 
+  // ===== VALIDATION HELPERS =====
+  const validation = {
+    email: (email) => {
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return re.test(email) ? null : "Invalid email format";
+    },
+    password: (password) => {
+      if (password.length < 6) return "Password must be at least 6 characters";
+      return null;
+    },
+    passwordMatch: (password, confirm) => {
+      return password === confirm ? null : "Passwords don't match";
+    },
+    name: (name) => {
+      if (!name.trim()) return "Name is required";
+      if (name.length < 2) return "Name must be at least 2 characters";
+      return null;
+    },
+  };
+
+  const showError = (element, message) => {
+    if (!element) return;
+    element.textContent = message;
+    element.style.display = message ? "block" : "none";
+  };
+
+  const setLoading = (button, isLoading) => {
+    const text = button.querySelector(".btn-text");
+    const loader = button.querySelector(".btn-loader");
+    if (text && loader) {
+      text.style.display = isLoading ? "none" : "inline";
+      loader.style.display = isLoading ? "inline" : "none";
+    }
+    button.disabled = isLoading;
+  };
+
+  // ===== LOGIN FORM =====
   el.loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-    const session = await api("/api/auth/login", { method: "POST", body: JSON.stringify(payload) });
-    state.token = session.token;
-    localStorage.setItem("ticketrush-token", state.token);
-    el.loginDialog.close();
-    await bootstrap();
+    const submitBtn = el.loginForm.querySelector(".submit-btn");
+    const formErrorEl = document.querySelector("#login-form-error");
+    const emailInput = document.querySelector("#login-email");
+    const passwordInput = document.querySelector("#login-password");
+
+    // Validation
+    const emailError = validation.email(emailInput.value);
+    const passwordError = validation.password(passwordInput.value);
+
+    showError(document.querySelector("#login-email-error"), emailError);
+    showError(document.querySelector("#login-password-error"), passwordError);
+
+    if (emailError || passwordError) return;
+
+    try {
+      setLoading(submitBtn, true);
+      showError(formErrorEl, "");
+
+      const payload = {
+        email: emailInput.value.trim(),
+        password: passwordInput.value,
+      };
+
+      const session = await api("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      state.token = session.token;
+      localStorage.setItem("ticketrush-token", state.token);
+      el.loginDialog.close();
+      el.loginForm.reset();
+      await bootstrap();
+    } catch (error) {
+      showError(formErrorEl, `Login failed: ${error.message}`);
+    } finally {
+      setLoading(submitBtn, false);
+    }
   });
 
+  // ===== REGISTER FORM =====
   el.registerForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-    const session = await api("/api/auth/register", { method: "POST", body: JSON.stringify(payload) });
-    state.token = session.token;
-    localStorage.setItem("ticketrush-token", state.token);
-    el.registerDialog.close();
-    await bootstrap();
+    const submitBtn = el.registerForm.querySelector(".submit-btn");
+    const formErrorEl = document.querySelector("#register-form-error");
+    const nameInput = document.querySelector("#register-name");
+    const emailInput = document.querySelector("#register-email");
+    const passwordInput = document.querySelector("#register-password");
+    const confirmPasswordInput = document.querySelector(
+      "#register-confirm-password"
+    );
+    const termsInput = document.querySelector('input[name="terms"]');
+
+    // Validation
+    const nameError = validation.name(nameInput.value);
+    const emailError = validation.email(emailInput.value);
+    const passwordError = validation.password(passwordInput.value);
+    const confirmError = validation.passwordMatch(
+      passwordInput.value,
+      confirmPasswordInput.value
+    );
+    const termsError = termsInput.checked ? null : "You must agree to terms";
+
+    showError(document.querySelector("#register-name-error"), nameError);
+    showError(document.querySelector("#register-email-error"), emailError);
+    showError(document.querySelector("#register-password-error"), passwordError);
+    showError(
+      document.querySelector("#register-confirm-password-error"),
+      confirmError
+    );
+    showError(document.querySelector("#register-terms-error"), termsError);
+
+    if (nameError || emailError || passwordError || confirmError || termsError)
+      return;
+
+    try {
+      setLoading(submitBtn, true);
+      showError(formErrorEl, "");
+
+      const payload = {
+        name: nameInput.value.trim(),
+        email: emailInput.value.trim(),
+        password: passwordInput.value,
+      };
+
+      const session = await api("/api/auth/register", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      state.token = session.token;
+      localStorage.setItem("ticketrush-token", state.token);
+      el.registerDialog.close();
+      el.registerForm.reset();
+      await bootstrap();
+    } catch (error) {
+      showError(formErrorEl, `Registration failed: ${error.message}`);
+    } finally {
+      setLoading(submitBtn, false);
+    }
   });
 
+  // ===== FORGOT PASSWORD FORM =====
+  const forgotPasswordForm = document.querySelector("#forgot-password-form");
+  if (forgotPasswordForm) {
+    forgotPasswordForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const submitBtn = forgotPasswordForm.querySelector(".submit-btn");
+      const formErrorEl = document.querySelector(
+        "#forgot-password-form-error"
+      );
+      const successEl = document.querySelector("#forgot-password-form-success");
+      const emailInput = document.querySelector("#forgot-email");
+
+      const emailError = validation.email(emailInput.value);
+      showError(document.querySelector("#forgot-email-error"), emailError);
+
+      if (emailError) return;
+
+      try {
+        setLoading(submitBtn, true);
+        showError(formErrorEl, "");
+        successEl.style.display = "none";
+
+        // TODO: Call backend API when ready
+        // await api("/api/auth/forgot-password", {
+        //   method: "POST",
+        //   body: JSON.stringify({ email: emailInput.value.trim() }),
+        // });
+
+        successEl.style.display = "block";
+        emailInput.value = "";
+        setTimeout(() => {
+          document.querySelector("#forgot-password-dialog").close();
+          successEl.style.display = "none";
+        }, 2000);
+      } catch (error) {
+        showError(formErrorEl, `Error: ${error.message}`);
+      } finally {
+        setLoading(submitBtn, false);
+      }
+    });
+  }
+
+  // ===== DIALOG SWITCHING =====
+  document.querySelector("#switch-to-register")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    el.loginDialog.close();
+    el.registerDialog.showModal();
+  });
+
+  document.querySelector("#switch-to-login")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    el.registerDialog.close();
+    el.loginDialog.showModal();
+  });
+
+  document.querySelector("#forgot-password-link")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    el.loginDialog.close();
+    document.querySelector("#forgot-password-dialog").showModal();
+  });
+
+  document.querySelector("#back-to-login")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    document.querySelector("#forgot-password-dialog").close();
+    el.loginDialog.showModal();
+  });
+
+  // ===== OAUTH BUTTONS (UI only) =====
+  document.querySelectorAll("[data-oauth]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      alert(`${btn.dataset.oauth} OAuth integration coming soon!`);
+    });
+  });
+
+  // ===== CHECKOUT FORM (giữ nguyên) =====
   el.checkoutForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
+    const payload = Object.fromEntries(
+      new FormData(event.currentTarget).entries()
+    );
     const result = await api(`/api/shows/${state.activeShowId}/checkout`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
-    if (result.pointsEarned) alert(`Payment completed. You earned ${result.pointsEarned} points.`);
+    if (result.pointsEarned)
+      alert(`Payment completed. You earned ${result.pointsEarned} points.`);
     el.checkoutDialog.close();
     event.currentTarget.reset();
     await bootstrap();
