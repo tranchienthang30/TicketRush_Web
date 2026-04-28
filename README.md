@@ -23,10 +23,15 @@ Ban microservices Java cho web dat ve xem phim `Starlight Rush`.
 
 ## Chay ung dung
 
-```powershell
+```powershell 
+Window:
 javac -d out src\ticketrush\*.java
 java -cp out ticketrush.Main
 ```
+MacOS:
+javac -d out src/ticketrush/*.java
+java -cp out ticketrush.Main
+
 
 Mo `http://127.0.0.1:8000`
 
