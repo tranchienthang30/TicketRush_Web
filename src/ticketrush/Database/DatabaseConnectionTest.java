@@ -1,4 +1,4 @@
-package ticketrush.Database;
+package ticketrush.database;
 
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
