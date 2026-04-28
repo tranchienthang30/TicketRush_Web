@@ -1,0 +1,125 @@
+NGỮ CẢNH CƠ SỞ DỮ LIỆU (DATABASE CONTEXT FOR AI)
+Hệ quản trị CSDL: MongoDB (NoSQL)
+Tên Database: movie_booking
+
+1. Sơ đồ các luồng quan hệ chính (Relationships)
+Luồng Cơ Sở Vật Chất (Facility): cinemas (1) ──> (N) halls (1) ──> (N) seats
+Một Rạp có nhiều Phòng chiếu. Một Phòng chiếu có nhiều Ghế.
+Luồng Lịch Chiếu (Scheduling):
+movies (1) ──> (N) showtimes
+halls (1) ──> (N) showtimes
+cinemas (1) ──> (N) showtimes (Denormalized - Chuẩn hoá ngược để truy vấn nhanh)
+Một Suất chiếu là sự kết hợp của 1 Phim, chiếu tại 1 Phòng của 1 Rạp vào 1 thời điểm.
+Luồng Giao Dịch (Transaction):
+users (1) ──> (N) bookings (1) ──> (1 hoặc N) payments
+showtimes (1) ──> (N) bookings
+Một User đặt 1 Vé (Booking) cho 1 Suất chiếu. Mỗi Booking sẽ có bản ghi Thanh toán (Payment) đi kèm.
+
+2. Chi tiết từng Collection & Khóa ngoại (References)
+
+2.1. movies (Danh sách phim)
+Vai trò: Lưu trữ thông tin metadata của phim (tên, đạo diễn, diễn viên, thời lượng, thể loại...).
+Quan hệ: Độc lập. Được tham chiếu bởi showtimes.
+
+2.2. cinemas (Cụm rạp)
+Vai trò: Lưu thông tin của một rạp chiếu phim vật lý (Tên, địa chỉ, toạ độ...).
+Quan hệ: Độc lập. Được tham chiếu bởi halls và showtimes.
+
+2.3. halls (Phòng chiếu)
+Vai trò: Các phòng chiếu bên trong một rạp.
+Khóa ngoại: cinema_id (tham chiếu đến cinemas).
+
+2.4. seats (Ghế ngồi)
+Vai trò: Sơ đồ ghế cố định của từng phòng chiếu. Chứa thông tin loại ghế (standard, vip, couple) để tính giá.
+Khóa ngoại: hall_id (tham chiếu đến halls).
+
+2.5. showtimes (Suất chiếu)
+Vai trò: Lịch chiếu cụ thể của một phim. Bảng này là trung tâm của hệ thống booking.
+Khóa ngoại: * movie_id -> movies
+hall_id -> halls
+cinema_id -> cinemas (Kỹ thuật Denormalization: Lưu sẵn cinema_id để dễ dàng query "Tìm các suất chiếu tại rạp X" mà không cần JOIN qua halls).
+
+2.6. users (Người dùng)
+Vai trò: Thông tin khách hàng, điểm tích luỹ, hạng thành viên.
+Quan hệ: Độc lập. Được tham chiếu bởi bookings và payments.
+
+2.7. bookings (Đơn đặt vé)
+Vai trò: Lưu trữ trạng thái đơn hàng mua vé.
+Khóa ngoại: user_id -> users, showtime_id -> showtimes.
+ĐẶC ĐIỂM QUAN TRỌNG (Cần chú ý khi code API): Dùng kỹ thuật Snapshot Pattern. Thay vì chỉ lưu reference, Collection này nhúng (embed) trực tiếp thông tin tại thời điểm đặt vé để tránh bị ảnh hưởng nếu dữ liệu gốc thay đổi trong tương lai:
+movie_snapshot: Lưu cứng tên phim và poster.
+showtime_snapshot: Lưu cứng thời gian, tên rạp, tên phòng.
+seats: Array chứa thông tin các ghế đã đặt (seat_id, label, type, price).
+
+2.8. payments (Thanh toán)
+Vai trò: Ghi nhận lịch sử giao dịch thanh toán của Booking.
+Khóa ngoại: booking_id -> bookings, user_id -> users.
+
+3. Sơ đồ thực thể ERD (Dạng Mermaid - Dùng để AI tự vẽ trong đầu)
+Bạn có thể copy luôn đoạn code Markdown Mermaid này cho AI, chúng hiểu định dạng này rất xuất sắc:
+Code snippet
+erDiagram
+    MOVIES {
+        ObjectId _id PK
+        String title
+        String status
+    }
+    CINEMAS {
+        ObjectId _id PK
+        String name
+        String city
+    }
+    HALLS {
+        ObjectId _id PK
+        ObjectId cinema_id FK
+        String name
+    }
+    SEATS {
+        ObjectId _id PK
+        ObjectId hall_id FK
+        String label
+        String type
+    }
+    SHOWTIMES {
+        ObjectId _id PK
+        ObjectId movie_id FK
+        ObjectId hall_id FK
+        ObjectId cinema_id FK
+        Date start_time
+    }
+    USERS {
+        ObjectId _id PK
+        String email
+        String phone
+    }
+    BOOKINGS {
+        ObjectId _id PK
+        ObjectId user_id FK
+        ObjectId showtime_id FK
+        Object movie_snapshot "Embedded"
+        Object showtime_snapshot "Embedded"
+        Array seats "Embedded"
+    }
+    PAYMENTS {
+        ObjectId _id PK
+        ObjectId booking_id FK
+        ObjectId user_id FK
+        String status
+    }
+
+    CINEMAS ||--o{ HALLS : "has"
+    HALLS ||--o{ SEATS : "contains"
+    MOVIES ||--o{ SHOWTIMES : "is played in"
+    HALLS ||--o{ SHOWTIMES : "hosts"
+    CINEMAS ||--o{ SHOWTIMES : "hosts (denormalized)"
+    USERS ||--o{ BOOKINGS : "makes"
+    SHOWTIMES ||--o{ BOOKINGS : "receives"
+    BOOKINGS ||--o| PAYMENTS : "has"
+
+
+4. Nguyên tắc khi prompt AI thêm:
+Khi bạn cung cấp context này cho AI, hãy kèm theo Rule thao tác này để AI viết code an toàn hơn:
+Khi tạo Booking: Không chỉ lấy id mà phải fetch dữ liệu từ movies, cinemas, halls, seats để tạo object cho movie_snapshot, showtime_snapshot và tính tổng tiền dựa vào loại ghế (vip, couple...).
+Khi huỷ/thanh toán Booking: Phải cập nhật status ở cả collection bookings lẫn collection payments thông qua booking_id.
+Tra cứu lịch chiếu: Ưu tiên query trên collection showtimes với bộ lọc cinema_id hoặc movie_id dựa trên các index đã đánh sẵn để tối ưu tốc độ.
+
