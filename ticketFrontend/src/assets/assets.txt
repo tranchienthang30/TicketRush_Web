@@ -1,0 +1,1 @@
+Chứa các tài nguyên tĩnh (Hình ảnh, CSS, Fonts)

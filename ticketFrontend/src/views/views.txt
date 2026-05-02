@@ -1,0 +1,2 @@
+Chứa các trang hiển thị chính (Được gọi bởi Router)
+Mỗi file trong này tương ứng với 1 URL trên trình duyệt

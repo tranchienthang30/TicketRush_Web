@@ -1,0 +1,3 @@
+Đôi khi thông tin trong model quá nhiều (có cả mật khẩu, mã ID phức tạp)
+nếu không muốn gửi hết cho khách. dto giúp lọc ra những gì cần thiết để gửi đi hoặc nhận vào.
+=> khác repository ở chỗ dto là phần làm việc giữa controller và frontend
