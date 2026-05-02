@@ -1,0 +1,2 @@
+Định nghĩa cấu trúc dữ liệu sẽ lưu vào Database.
+Mỗi file trong này đại diện cho một bảng (hoặc Collection trong MongoDB)

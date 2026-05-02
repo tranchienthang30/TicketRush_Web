@@ -1,0 +1,2 @@
+Nơi chứa các file cấu hình cho dự án. 
+Ví dụ: Cấu hình bảo mật (Spring Security), cấu hình cho phép Frontend truy cập vào Backend (CORS)

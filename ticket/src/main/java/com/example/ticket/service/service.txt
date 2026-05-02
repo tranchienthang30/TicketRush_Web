@@ -1,0 +1,2 @@
+Controller chỉ nhận yêu cầu rồi chuyển cho Service. Service sẽ thực hiện xử lý logic
+rồi đưa kết quả cho Controller đem ra trả khách

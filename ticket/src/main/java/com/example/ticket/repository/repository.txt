@@ -1,0 +1,2 @@
+Đây là nơi thực hiện các lệnh trực tiếp với Database (Thêm, Xóa, Sửa, Tìm kiếm).
+Bạn không cần viết code SQL hay MongoDB phức tạp, chỉ cần gọi hàm của nó

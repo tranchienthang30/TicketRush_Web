@@ -1,0 +1,2 @@
+Tiếp nhận yêu cầu (Request) từ trình duyệt (Frontend), kiểm tra xem khách muốn gì,
+sau đó điều hướng yêu cầu đó đến các bộ phận khác xử lý rồi trả kết quả (Response) về cho khách.
