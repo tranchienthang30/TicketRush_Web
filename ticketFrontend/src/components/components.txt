@@ -1,0 +1,2 @@
+Chứa các mảnh ghép UI dùng chung
+Chứa các mảnh giao diện (UI) nhỏ, có thể tái sử dụng ở nhiều nơi
