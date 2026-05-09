@@ -1,18 +1,16 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRouter } from "vue-router";
-import { useAuthStore } from "../stores/authStore.js";
 
 defineProps(["isDark"]);
 const emit = defineEmits(["toggle-theme"]);
 
 const router = useRouter();
-const authStore = useAuthStore();
 
 const showProfileMenu = ref(false);
 
-const isLoggedIn = computed(() => authStore.isLoggedIn);
-const currentUser = computed(() => authStore.currentUser);
+const isLoggedIn = true;
+
 
 const closeMenu = (e) => {
   if (!e.target.closest(".profile-dropdown-container")) {
@@ -20,11 +18,6 @@ const closeMenu = (e) => {
   }
 };
 
-function handleLogout() {
-  authStore.logout();
-  showProfileMenu.value = false;
-  router.push("/login");
-}
 
 onMounted(() => window.addEventListener("click", closeMenu));
 onUnmounted(() => window.removeEventListener("click", closeMenu));
