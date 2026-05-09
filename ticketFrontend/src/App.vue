@@ -2,9 +2,8 @@
 import { ref, onMounted } from "vue";
 import Header from "./layout/Header.vue";
 import Footer from "./layout/Footer.vue";
-import { useAuthStore } from "./stores/authStore";
 
-const authStore = useAuthStore();
+
 
 const isDark = ref(false);
 
@@ -15,7 +14,6 @@ const toggleTheme = () => {
 };
 
 onMounted(() => {
-  authStore.initAuth();
 
   const savedTheme = localStorage.getItem("theme");
 
