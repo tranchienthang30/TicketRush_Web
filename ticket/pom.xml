@@ -29,6 +29,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- SQL query APIs used by JdbcTemplate repositories -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
         <!-- PostgreSQL + JPA -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
