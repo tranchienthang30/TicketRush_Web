@@ -2,14 +2,17 @@ package com.example.ticket.controller;
 
 import com.example.ticket.dto.CategoryEventsResponse;
 import com.example.ticket.dto.CategoryResponse;
+import com.example.ticket.dto.BookingEventResponse;
 import com.example.ticket.dto.EventPageResponse;
 import com.example.ticket.service.EventService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
@@ -41,5 +44,12 @@ public class EventController {
             @RequestParam(defaultValue = "4") int limitPerCategory
     ) {
         return eventService.getGroupedEvents(limitPerCategory);
+    }
+
+    @GetMapping("/events/{eventId}/booking")
+    public BookingEventResponse getBookingEvent(
+            @PathVariable UUID eventId
+    ) {
+        return eventService.getBookingEvent(eventId);
     }
 }
