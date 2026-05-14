@@ -53,6 +53,12 @@
             <artifactId>spring-boot-starter-oauth2-client</artifactId>
         </dependency>
 
+        <!-- Email delivery for password reset links -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Validate request DTO: @NotBlank, @Email, @Valid... -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
