@@ -1,24 +1,27 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { getMyTickets } from "../api/ticketRushApi";
+import { getMyTickets, getTicketDetail } from "../api/ticketRushApi";
 
 const loading = ref(true);
 const error = ref("");
 const tickets = ref([]);
 const selectedStatus = ref("upcoming");
 const selectedTicket = ref(null);
+const selectedTicketDetail = ref(null);
+const detailLoading = ref(false);
+const detailError = ref("");
 
 const statusOptions = [
-  { value: "upcoming", label: "Sắp diễn ra" },
-  { value: "past", label: "Đã diễn ra" },
-  { value: "all", label: "Tất cả" },
+  { value: "upcoming", label: "Upcoming" },
+  { value: "past", label: "Past" },
+  { value: "all", label: "All" },
 ];
 
 const statusLabelMap = {
-  PENDING: "Chờ thanh toán",
-  PAID: "Đã thanh toán",
-  EXPIRED: "Hết hạn",
-  CANCELLED: "Đã hủy",
+  PENDING: "Pending",
+  PAID: "Paid",
+  EXPIRED: "Expired",
+  CANCELLED: "Cancelled",
 };
 
 const statusClassMap = {
@@ -38,7 +41,7 @@ async function loadTickets() {
       limit: 50,
     })) || [];
   } catch {
-    error.value = "Không tải được danh sách vé. Vui lòng kiểm tra backend API.";
+    error.value = "Unable to load ticket list. Please check backend API.";
     tickets.value = [];
   } finally {
     loading.value = false;
@@ -73,31 +76,37 @@ function ticketIdentity(ticket) {
 
 function openTicketDetail(ticket) {
   selectedTicket.value = ticket;
+  selectedTicketDetail.value = null;
+  detailError.value = "";
+  detailLoading.value = true;
   document.body.classList.add("overflow-hidden");
+
+  getTicketDetail(ticket.orderId)
+    .then((data) => {
+      selectedTicketDetail.value = data;
+    })
+    .catch((err) => {
+      detailError.value = err?.response?.data?.message || "Unable to load ticket details.";
+    })
+    .finally(() => {
+      detailLoading.value = false;
+    });
 }
 
 function closeTicketDetail() {
   selectedTicket.value = null;
+  selectedTicketDetail.value = null;
+  detailError.value = "";
+  detailLoading.value = false;
   document.body.classList.remove("overflow-hidden");
 }
 
-const qrPayload = computed(() => {
-  if (!selectedTicket.value) return "";
-  return JSON.stringify({
-    ticketCode: ticketIdentity(selectedTicket.value),
-    orderId: selectedTicket.value.orderId,
-    eventId: selectedTicket.value.eventId,
-    eventTitle: selectedTicket.value.title,
-    seat: selectedTicket.value.seat,
-    status: selectedTicket.value.status,
-    startsAt: selectedTicket.value.startTime,
-  });
-});
+const detailTickets = computed(() => selectedTicketDetail.value?.tickets || []);
 
-const qrImageUrl = computed(() => {
-  if (!qrPayload.value) return "";
-  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrPayload.value)}`;
-});
+function qrImageUrl(content) {
+  if (!content) return "";
+  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(content)}`;
+}
 
 watch(selectedStatus, loadTickets);
 
@@ -116,10 +125,10 @@ onUnmounted(() => {
           My Tickets
         </p>
         <h1 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">
-          Vé của bạn
+          Your Tickets
         </h1>
         <p class="mt-4 max-w-2xl text-blue-100">
-          Xem lại toàn bộ vé đã đặt, trạng thái đơn hàng, và mở chi tiết từng vé để hiển thị QR check-in.
+          Review all booked tickets, order statuses, and open each ticket to view check-in QR.
         </p>
       </div>
     </section>
@@ -144,7 +153,7 @@ onUnmounted(() => {
         v-if="loading"
         class="mt-6 rounded-3xl border border-slate-200 bg-white p-8 text-center font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
       >
-        Đang tải danh sách vé...
+        Loading tickets...
       </div>
 
       <div
@@ -158,7 +167,7 @@ onUnmounted(() => {
         v-else-if="tickets.length === 0"
         class="mt-6 rounded-3xl border border-slate-200 bg-white p-8 text-center font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
       >
-        Không có vé nào trong bộ lọc hiện tại.
+        No tickets found for the current filter.
       </div>
 
       <div v-else class="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -184,9 +193,9 @@ onUnmounted(() => {
           </h2>
 
           <div class="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-            <p>Địa điểm: {{ ticket.location }}</p>
-            <p>Ghế: {{ ticket.seat }}</p>
-            <p>Mã vé: <span class="font-bold text-slate-700 dark:text-slate-100">{{ ticketIdentity(ticket) }}</span></p>
+            <p>Location: {{ ticket.location }}</p>
+            <p>Seat: {{ ticket.seat }}</p>
+            <p>Ticket code: <span class="font-bold text-slate-700 dark:text-slate-100">{{ ticketIdentity(ticket) }}</span></p>
           </div>
 
           <button
@@ -194,7 +203,7 @@ onUnmounted(() => {
             @click="openTicketDetail(ticket)"
             class="mt-5 w-full rounded-xl bg-brand-navy px-4 py-3 text-sm font-black uppercase tracking-[0.16em] text-white transition hover:bg-sky-800"
           >
-            Xem chi tiết & QR
+            View details & QR
           </button>
         </article>
       </div>
@@ -228,45 +237,59 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <div class="mt-6 grid gap-6 md:grid-cols-[1fr_1.2fr]">
-          <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
-            <img
-              :src="qrImageUrl"
-              alt="Ticket QR"
-              class="mx-auto h-56 w-56 rounded-xl border border-slate-200 bg-white p-2"
-            />
-            <p class="mt-3 text-center text-xs font-semibold text-slate-500 dark:text-slate-300">
-              Quét QR tại cổng check-in để xác nhận vé.
-            </p>
-          </div>
+        <div
+          v-if="detailLoading"
+          class="mt-6 rounded-2xl border border-slate-200 p-8 text-center font-bold text-slate-500 dark:border-slate-700 dark:text-slate-300"
+        >
+          Loading ticket details...
+        </div>
 
+        <div
+          v-else-if="detailError"
+          class="mt-6 rounded-2xl border border-red-100 bg-red-50 p-6 text-sm font-bold text-red-700"
+        >
+          {{ detailError }}
+        </div>
+
+        <div v-else-if="selectedTicketDetail" class="mt-6 space-y-4">
           <div class="rounded-2xl border border-slate-200 p-5 dark:border-slate-700">
             <div class="space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <p>
-                Mã vé:
-                <span class="font-bold text-slate-800 dark:text-white">{{ ticketIdentity(selectedTicket) }}</span>
+                Order ID:
+                <span class="font-bold text-slate-800 dark:text-white">{{ selectedTicketDetail.orderId }}</span>
               </p>
               <p>
-                Mã đơn hàng:
-                <span class="font-bold text-slate-800 dark:text-white">{{ selectedTicket.orderId }}</span>
+                Status:
+                <span class="font-bold text-slate-800 dark:text-white">{{ statusLabel(selectedTicketDetail.orderStatus) }}</span>
               </p>
               <p>
-                Trạng thái:
-                <span class="font-bold text-slate-800 dark:text-white">{{ statusLabel(selectedTicket.status) }}</span>
+                Total:
+                <span class="font-bold text-slate-800 dark:text-white">{{ selectedTicketDetail.displayTotal }}</span>
               </p>
               <p>
-                Ghế:
-                <span class="font-bold text-slate-800 dark:text-white">{{ selectedTicket.seat }}</span>
-              </p>
-              <p>
-                Thời gian:
-                <span class="font-bold text-slate-800 dark:text-white">{{ formatDate(selectedTicket.startTime) }}</span>
+                Event time:
+                <span class="font-bold text-slate-800 dark:text-white">{{ selectedTicketDetail.date }}</span>
               </p>
             </div>
+          </div>
 
-            <div class="mt-5 rounded-xl bg-slate-50 p-4 text-xs text-slate-500 dark:bg-slate-900 dark:text-slate-300">
-              QR đang encode đầy đủ thông tin vé: `ticketCode`, `orderId`, `eventId`, `seat`, `status`, `startsAt`.
-            </div>
+          <div class="grid gap-4 md:grid-cols-2">
+            <article
+              v-for="item in detailTickets"
+              :key="item.orderItemId"
+              class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"
+            >
+              <img
+                :src="qrImageUrl(item.qrContent || item.qrCode)"
+                alt="Ticket QR"
+                class="mx-auto h-44 w-44 rounded-xl border border-slate-200 bg-white p-2"
+              />
+              <div class="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                <p>Seat: <span class="font-bold text-slate-800 dark:text-white">{{ item.seatCode }}</span></p>
+                <p>Ticket status: <span class="font-bold text-slate-800 dark:text-white">{{ item.ticketStatus }}</span></p>
+                <p>QR code: <span class="font-bold text-slate-800 dark:text-white">{{ item.qrCode || "N/A" }}</span></p>
+              </div>
+            </article>
           </div>
         </div>
       </div>
