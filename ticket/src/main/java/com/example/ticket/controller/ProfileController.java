@@ -3,11 +3,13 @@ package com.example.ticket.controller;
 import com.example.ticket.dto.OrderSummaryResponse;
 import com.example.ticket.dto.ProfileDashboardResponse;
 import com.example.ticket.dto.ProfileResponse;
+import com.example.ticket.dto.TicketDetailResponse;
 import com.example.ticket.dto.TicketSummaryResponse;
 import com.example.ticket.dto.UpdateProfileRequest;
 import com.example.ticket.service.CurrentUserService;
 import com.example.ticket.service.ProfileService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -65,5 +67,13 @@ public class ProfileController {
             @RequestHeader(name = "X-User-Id", required = false) UUID userId
     ) {
         return profileService.getOrders(currentUserService.resolve(userId));
+    }
+
+    @GetMapping("/tickets/{orderId}")
+    public TicketDetailResponse getTicketDetail(
+            @RequestHeader(name = "X-User-Id", required = false) UUID userId,
+            @PathVariable UUID orderId
+    ) {
+        return profileService.getTicketDetail(currentUserService.resolve(userId), orderId);
     }
 }
