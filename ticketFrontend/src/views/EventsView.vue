@@ -1,44 +1,37 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-import EventCard from '../components/EventCard.vue'; // 1. Import Component vào đây
+import { computed, onMounted, ref } from "vue";
+import EventCard from "@/components/EventCard.vue";
+import * as eventApi from "@/api/event.api";
 
-// 1. Mock Data (Giả lập dữ liệu trả về từ Backend API)
-const categories = ref([
-  {
-    id: 1,
-    name: "Music & Concerts",
-    description: "Experience the best live performances and music festivals.",
-    events: [
-      { id: 101, title: "Rock the Night 2024", date: "Dec 15, 2024", location: "Hanoi Opera House", price: "450,000 VND", tag: "Hot", image: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=500&q=80" },
-      { id: 102, title: "Jazz & Wine Evening", date: "Jan 10, 2025", location: "Saigon Rooftop", price: "1,200,000 VND", tag: "Exclusive", image: "https://images.unsplash.com/photo-1514525253344-a8130a2185d0?auto=format&fit=crop&w=500&q=80" },
-      { id: 103, title: "Underground EDM Rave", date: "Dec 30, 2024", location: "Warehouse District", price: "300,000 VND", tag: "New", image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=500&q=80" },
-    ]
-  },
-  {
-    id: 2,
-    name: "Sports & Fitness",
-    description: "Join the most exciting matches and athletic challenges.",
-    events: [
-      { id: 201, title: "City Half-Marathon", date: "Feb 20, 2025", location: "Hoan Kiem Lake", price: "500,000 VND", tag: "Early Bird", image: "https://images.unsplash.com/photo-1533560904424-a0c61dc306fc?auto=format&fit=crop&w=500&q=80" },
-      { id: 202, title: "Basketball All-Stars", date: "Mar 05, 2025", location: "Military Zone 7 Stadium", price: "250,000 VND", tag: "Selling Fast", image: "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=500&q=80" },
-    ]
-  },
-  {
-    id: 3,
-    name: "Workshops & Seminars",
-    description: "Learn new skills and network with industry experts.",
-    events: [
-      { id: 301, title: "UI/UX Design Masterclass", date: "Dec 22, 2024", location: "Tech Hub Center", price: "2,000,000 VND", tag: "Limited Space", image: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=500&q=80" },
-      { id: 302, title: "Digital Marketing 101", date: "Jan 15, 2025", location: "Online (Zoom)", price: "FREE", tag: "Open", image: "https://images.unsplash.com/photo-1432888622747-4eb9a8f2c20e?auto=format&fit=crop&w=500&q=80" },
-    ]
+const events = ref([]);
+const categories = ref([]);
+const loading = ref(false);
+const error = ref("");
+
+const eventsByCategory = computed(() =>
+  categories.value
+    .map((category) => ({
+      ...category,
+      events: events.value.filter((event) => event.categoryId === category.id),
+    }))
+    .filter((category) => category.events.length > 0)
+);
+
+onMounted(async () => {
+  loading.value = true;
+  try {
+    const [categoryResponse, eventResponse] = await Promise.all([
+      eventApi.getCategories(),
+      eventApi.getPublicEvents(),
+    ]);
+    categories.value = categoryResponse.data;
+    events.value = eventResponse.data;
+  } catch (err) {
+    error.value = "Unable to load events.";
+  } finally {
+    loading.value = false;
   }
-]);
-
-// Sau này bạn sẽ dùng hàm này để gọi API thật
-// onMounted(async () => {
-//   const response = await fetch('your-backend-api/categories');
-//   categories.value = await response.json();
-// });
+});
 </script>
 
 <template>
@@ -53,9 +46,13 @@ const categories = ref([
     </div>
 
     <div class="max-w-7xl mx-auto px-4 md:px-8">
-      
-      <section v-for="category in categories" :key="category.id" class="mb-20">
-        
+      <p v-if="loading" class="text-center text-slate-500 dark:text-slate-400">Loading events...</p>
+      <p v-else-if="error" class="text-center text-red-600">{{ error }}</p>
+      <p v-else-if="events.length === 0" class="text-center text-slate-500 dark:text-slate-400">
+        No published events yet.
+      </p>
+
+      <section v-for="category in eventsByCategory" :key="category.id" class="mb-20">
         <div class="mb-8 border-b border-gray-200 dark:border-slate-800 pb-4">
           <div class="flex items-center gap-3 mb-2">
             <h2 class="text-3xl font-black text-brand-navy dark:text-white uppercase tracking-tight">
@@ -69,19 +66,9 @@ const categories = ref([
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          <EventCard 
-            v-for="event in category.events" 
-            :key="event.id" 
-            :event="event" 
-          />
+          <EventCard v-for="event in category.events" :key="event.id" :event="event" />
         </div>
-
       </section>
-
     </div>
   </div>
 </template>
-
-<style scoped>
-/* Bạn có thể thêm các hiệu ứng riêng cho trang này ở đây */
-</style>

@@ -41,17 +41,41 @@ spring:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID:your id}
-            client-secret: ${GOOGLE_CLIENT_SECRET:your secret}
+            client-id: ${GOOGLE_CLIENT_ID:1012024353920-k2lnvg2iafu7ic6dm9ac9qccncs9dm4b.apps.googleusercontent.com}
+            client-secret: ${GOOGLE_CLIENT_SECRET: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}
             scope:
               - openid
               - email
               - profile
 
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+
 app:
   jwt:
     secret: ${JWT_SECRET:this-is-a-demo-secret-key-at-least-32-characters-long}
     expiration-ms: 86400000
+    refresh-expiration-ms: 604800000
+
+  mail:
+    from: ${MAIL_FROM:no-reply@ticketrush.local}
+
+  session:
+    customer-duration-ms: 1800000
+
+  recaptcha:
+    enabled: ${RECAPTCHA_ENABLED:false}
+    secret: ${RECAPTCHA_SECRET:}
+    min-score: ${RECAPTCHA_MIN_SCORE:0.5}
 
   booking:
     lock-minutes: 10
