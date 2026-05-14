@@ -18,7 +18,7 @@ async function handleLogin() {
   error.value = "";
 
   if (!form.email || !form.password) {
-    error.value = "Vui lòng nhập email và mật khẩu";
+    error.value = "Please enter your email and password";
     return;
   }
 
@@ -30,7 +30,7 @@ async function handleLogin() {
 
     router.push("/");
   } catch (err) {
-    error.value = authStore.error || "Đăng nhập thất bại";
+    error.value = authStore.error || "Login failed";
   }
 }
 
@@ -47,7 +47,7 @@ function handleGoogleLogin() {
           Welcome back
         </h1>
         <p class="text-gray-500 dark:text-gray-400 mt-2">
-          Đăng nhập để đặt vé và quản lý sự kiện
+          Sign in to book movie seats and manage your tickets.
         </p>
       </div>
 
@@ -71,7 +71,7 @@ function handleGoogleLogin() {
           <input
             v-model="form.password"
             type="password"
-            placeholder="••••••••"
+            placeholder="********"
             class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30"
           />
         </div>
@@ -85,7 +85,7 @@ function handleGoogleLogin() {
           :disabled="authStore.loading"
           class="w-full bg-brand-orange hover:bg-orange-600 disabled:opacity-60 text-white font-black py-3 rounded-xl transition active:scale-95"
         >
-          {{ authStore.loading ? "Đang đăng nhập..." : "Login" }}
+          {{ authStore.loading ? "Signing in..." : "Login" }}
         </button>
       </form>
 
@@ -104,9 +104,9 @@ function handleGoogleLogin() {
       </button>
 
       <p class="text-center mt-6 text-sm text-gray-500 dark:text-gray-400">
-        Chưa có tài khoản?
+        Do not have an account?
         <RouterLink to="/register" class="text-brand-orange font-bold hover:underline">
-          Đăng ký
+          Register
         </RouterLink>
       </p>
     </div>

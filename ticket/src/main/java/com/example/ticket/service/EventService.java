@@ -70,7 +70,7 @@ public class EventService {
 
     public BookingEventResponse getBookingEvent(UUID eventId) {
         EventQueryRepository.BookingEventRow event = eventRepository.findPublishedEventForBooking(eventId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Movie not found"));
 
         List<EventQueryRepository.BookingSectionRow> sections = eventRepository.findSectionsByEvent(eventId);
         Map<UUID, List<BookingSeatResponse>> seatsBySection = eventRepository.findSeatsByEvent(eventId).stream()

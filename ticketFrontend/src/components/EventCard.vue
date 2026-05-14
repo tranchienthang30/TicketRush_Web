@@ -9,10 +9,10 @@ const props = defineProps({
 });
 
 const fallbackImages = [
-  "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=700&q=80",
-  "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=700&q=80",
-  "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=700&q=80",
-  "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=700&q=80",
+  "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=700&q=80",
+  "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=700&q=80",
+  "https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?auto=format&fit=crop&w=700&q=80",
+  "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&w=700&q=80",
 ];
 
 const imageSrc = computed(() => {
@@ -32,7 +32,7 @@ const imageSrc = computed(() => {
       <img
         :src="imageSrc"
         class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-        alt="Event cover"
+        alt="Movie poster"
       />
 
       <div
@@ -49,8 +49,8 @@ const imageSrc = computed(() => {
       </h4>
 
       <div class="text-sm text-gray-500 dark:text-slate-400 mb-4 space-y-1">
-        <p>Date: {{ event.date }}</p>
-        <p>Location: {{ event.location }}</p>
+        <p>Showtime: {{ event.date }}</p>
+        <p>Cinema: {{ event.location }}</p>
       </div>
 
       <div class="mt-auto flex justify-between items-center pt-4 border-t border-gray-50 dark:border-slate-700">
@@ -59,7 +59,7 @@ const imageSrc = computed(() => {
           :to="`/booking?eventId=${event.id}`"
           class="bg-brand-navy text-white px-4 py-2 rounded-lg hover:bg-brand-orange transition-all font-bold shadow-md active:scale-95"
         >
-          Booking
+          Book Seats
         </router-link>
       </div>
     </div>

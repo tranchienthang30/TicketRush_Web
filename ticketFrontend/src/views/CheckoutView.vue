@@ -310,7 +310,7 @@ onMounted(async () => {
             <div v-else-if="summary" class="mt-6 space-y-4">
               <div class="rounded-2xl bg-slate-50 px-4 py-4 dark:bg-slate-900">
                 <p class="text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
-                  Event
+                  Movie
                 </p>
                 <p class="mt-2 text-lg font-black text-brand-navy dark:text-white">{{ summary.eventTitle }}</p>
               </div>

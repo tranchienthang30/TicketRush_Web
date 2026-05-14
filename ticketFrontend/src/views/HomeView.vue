@@ -15,7 +15,7 @@ async function loadHome() {
     const data = await getHome();
     featuredCategories.value = data.featuredCategories || [];
   } catch (err) {
-    error.value = "Could not load featured events. Please check the backend API.";
+    error.value = "Could not load featured movies. Please check the backend API.";
   } finally {
     loading.value = false;
   }
@@ -29,21 +29,21 @@ onMounted(loadHome);
     <section class="w-full h-64 md:h-96 bg-brand-navy rounded-3xl mb-16 flex items-center justify-center overflow-hidden relative shadow-2xl">
       <div class="text-center z-10 px-4">
         <h2 class="text-4xl md:text-7xl font-black text-white mb-6 uppercase tracking-tighter italic">
-          STAR<span class="text-brand-orange">LIGHT</span> EVENTS
+          STAR<span class="text-brand-orange">LIGHT</span> MOVIES
         </h2>
         <p class="text-blue-100 mb-8 text-lg font-medium">
-          Book your next extraordinary experience
+          Reserve seats for the latest films and premium screenings
         </p>
         <router-link
           to="/events"
           class="inline-flex bg-brand-orange hover:scale-110 transition-transform px-10 py-4 rounded-full text-white font-black shadow-lg uppercase tracking-widest text-sm"
         >
-          Explore Now
+          Explore Movies
         </router-link>
       </div>
       <div class="absolute inset-0 bg-gradient-to-r from-brand-navy via-transparent to-brand-navy opacity-50"></div>
       <img
-        src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1200&q=80"
+        src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80"
         class="absolute inset-0 w-full h-full object-cover opacity-30"
         alt="Banner background"
       />
@@ -53,7 +53,7 @@ onMounted(loadHome);
       v-if="loading"
       class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
     >
-      Loading featured events...
+      Loading featured movies...
     </div>
 
     <div
@@ -67,7 +67,7 @@ onMounted(loadHome);
       v-else-if="featuredCategories.length === 0"
       class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
     >
-      No featured events are available yet.
+      No featured movies are available yet.
     </div>
 
     <template v-else>
@@ -80,7 +80,7 @@ onMounted(loadHome);
             <div class="h-1.5 w-20 bg-brand-orange mt-2 rounded-full"></div>
           </div>
           <router-link to="/events" class="text-brand-orange font-bold hover:underline flex items-center gap-2 group">
-            View all <span class="group-hover:translate-x-1 transition-transform">-&gt;</span>
+            View all movies <span class="group-hover:translate-x-1 transition-transform">-&gt;</span>
           </router-link>
         </div>
 

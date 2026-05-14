@@ -265,7 +265,7 @@ onMounted(loadDashboard);
                   to="/events"
                   class="text-sm font-black uppercase tracking-[0.18em] text-brand-orange hover:underline"
                 >
-                  Explore more events
+                  Explore more movies
                 </router-link>
               </div>
 

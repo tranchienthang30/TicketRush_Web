@@ -4,8 +4,8 @@
       <div>
         <h3 class="text-xl font-bold mb-4 text-brand-orange">STARLIGHT</h3>
         <p class="text-gray-300 text-sm leading-relaxed">
-          The first ticketing and event organizing platform will bring you the best entertainment
-          experiences.
+          Your cinema ticketing home for movie showtimes, seat booking, and better
+          entertainment nights.
         </p>
       </div>
       <div>

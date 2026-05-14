@@ -1,11 +1,11 @@
 <template>
   <div class="max-w-5xl mx-auto p-6">
-    <h1 class="text-3xl font-bold mb-6">Create New Event</h1>
+    <h1 class="text-3xl font-bold mb-6">Create New Screening</h1>
 
     <form @submit.prevent="handleCreateEvent" class="space-y-6">
       <div>
-        <label class="block font-semibold mb-1">Event Title</label>
-        <input v-model="form.title" type="text" placeholder="Enter event title"
+        <label class="block font-semibold mb-1">Movie Title</label>
+        <input v-model="form.title" type="text" placeholder="Enter movie title"
                class="w-full border rounded-lg p-2" />
       </div>
 
@@ -50,7 +50,7 @@
       <EventSeatConfig v-model="form.seats" />
 
       <button type="submit" class="bg-brand-orange text-white px-6 py-3 rounded-lg font-bold">
-        Create Event
+        Create Screening
       </button>
     </form>
   </div>
@@ -82,6 +82,6 @@ function handleCreateEvent() {
   // lưu tạm vào store (frontend)
   store.createEvent(form);
 
-  alert('Event created successfully! You can manage it in My Events.');
+  alert('Screening created successfully! You can manage it in My Screenings.');
 }
 </script>

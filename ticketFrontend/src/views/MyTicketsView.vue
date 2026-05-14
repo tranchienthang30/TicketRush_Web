@@ -193,7 +193,7 @@ onUnmounted(() => {
           </h2>
 
           <div class="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-            <p>Location: {{ ticket.location }}</p>
+            <p>Cinema: {{ ticket.location }}</p>
             <p>Seat: {{ ticket.seat }}</p>
             <p>Ticket code: <span class="font-bold text-slate-700 dark:text-slate-100">{{ ticketIdentity(ticket) }}</span></p>
           </div>
@@ -224,7 +224,7 @@ onUnmounted(() => {
               {{ selectedTicket.title }}
             </h3>
             <p class="mt-2 text-sm text-slate-500 dark:text-slate-300">
-              {{ formatDate(selectedTicket.startTime) }} • {{ selectedTicket.location }}
+              {{ formatDate(selectedTicket.startTime) }} - {{ selectedTicket.location }}
             </p>
           </div>
 
@@ -267,7 +267,7 @@ onUnmounted(() => {
                 <span class="font-bold text-slate-800 dark:text-white">{{ selectedTicketDetail.displayTotal }}</span>
               </p>
               <p>
-                Event time:
+                Showtime:
                 <span class="font-bold text-slate-800 dark:text-white">{{ selectedTicketDetail.date }}</span>
               </p>
             </div>

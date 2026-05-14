@@ -95,7 +95,7 @@ public class MembershipService {
         String discount = row.discountPercent().stripTrailingZeros().toPlainString() + "% discount on eligible orders";
         return switch (row.name().toLowerCase(Locale.ROOT)) {
             case "silver" -> List.of(discount, "Member voucher access", "Faster support queue");
-            case "gold" -> List.of(discount, "Early access to selected events", "Priority booking support");
+            case "gold" -> List.of(discount, "Early access to selected screenings", "Priority booking support");
             case "premium" -> List.of(discount, "Best member voucher access", "VIP support for group bookings");
             default -> List.of(discount, row.durationDays() + " days of active membership");
         };
