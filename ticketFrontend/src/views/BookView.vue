@@ -1,297 +1,303 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { getBookingEvent, getEvents } from '../api/ticketRushApi';
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { getBookingEvent, getEvents } from "../api/ticketRushApi";
 
-const CHECKOUT_STORAGE_KEY = 'ticketrush_checkout_payload';
+const CHECKOUT_STORAGE_KEY = "ticketrush_checkout_payload";
+const SELECT_TIMEOUT_SECONDS = 10 * 60;
 
 const route = useRoute();
 const router = useRouter();
 
 const loading = ref(true);
-const error = ref('');
+const error = ref("");
 const bookingEvent = ref(null);
 const selectedSeats = ref([]);
+const timerSeconds = ref(SELECT_TIMEOUT_SECONDS);
+let timerHandle = null;
 
-function formatPrice(value) {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
+const visibleSeats = computed(() => {
+  const sections = bookingEvent.value?.sections || [];
+  return sections
+    .flatMap((section) =>
+      (section.seats || [])
+        .filter((seat) => !seat.hidden)
+        .map((seat) => ({
+          ...seat,
+          sectionName: section.name,
+          seatTypeCode: (seat.seatTypeCode || "STANDARD").toUpperCase(),
+          layoutX: seat.layoutX ?? seat.seatNumber,
+          layoutY: seat.layoutY ?? rowToIndex(seat.rowLabel),
+        })),
+    )
+    .sort((a, b) => {
+      if (a.layoutY !== b.layoutY) return a.layoutY - b.layoutY;
+      return a.layoutX - b.layoutX;
+    });
+});
+
+const rowGroups = computed(() => {
+  const grouped = visibleSeats.value.reduce((acc, seat) => {
+    if (!acc[seat.rowLabel]) acc[seat.rowLabel] = [];
+    acc[seat.rowLabel].push(seat);
+    return acc;
+  }, {});
+
+  return Object.entries(grouped)
+    .sort(([rowA], [rowB]) => rowA.localeCompare(rowB))
+    .map(([rowLabel, seats]) => ({
+      rowLabel,
+      seats: seats.sort((a, b) => a.layoutX - b.layoutX),
+    }));
+});
+
+const selectedSeatCodes = computed(() => selectedSeats.value.map((seat) => seat.seatCode));
+const totalPrice = computed(() => selectedSeats.value.reduce((sum, seat) => sum + Number(seat.price || 0), 0));
+
+const showtimeLabel = computed(() => {
+  if (!bookingEvent.value?.startTime) return "";
+  return new Intl.DateTimeFormat("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(bookingEvent.value.startTime));
+});
+
+const eventDateLabel = computed(() => {
+  if (!bookingEvent.value?.startTime) return "";
+  return new Intl.DateTimeFormat("vi-VN", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(bookingEvent.value.startTime));
+});
+
+const timeoutLabel = computed(() => {
+  const mins = Math.floor(timerSeconds.value / 60)
+    .toString()
+    .padStart(2, "0");
+  const secs = (timerSeconds.value % 60).toString().padStart(2, "0");
+  return `${mins}:${secs}`;
+});
+
+function rowToIndex(rowLabel) {
+  return String(rowLabel || "A").toUpperCase().charCodeAt(0) - 64;
+}
+
+function formatMoney(value) {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
   }).format(value || 0);
 }
 
-function formatEventDate(value) {
-  if (!value) return { day: '--', month: '--', weekday: '--' };
-
-  const date = new Date(value);
-  return {
-    day: String(date.getDate()).padStart(2, '0'),
-    month: `Th. ${String(date.getMonth() + 1).padStart(2, '0')}`,
-    weekday: new Intl.DateTimeFormat('vi-VN', { weekday: 'long' }).format(date),
-  };
+function isSeatSelected(seatId) {
+  return selectedSeats.value.some((seat) => seat.id === seatId);
 }
 
-const eventDate = computed(() => formatEventDate(bookingEvent.value?.startTime));
-
-const sectionRows = computed(() => {
-  const sections = bookingEvent.value?.sections || [];
-
-  return sections.map((section) => {
-    const rowMap = new Map();
-
-    for (const seat of section.seats || []) {
-      if (!rowMap.has(seat.rowLabel)) {
-        rowMap.set(seat.rowLabel, []);
-      }
-      rowMap.get(seat.rowLabel).push(seat);
-    }
-
-    const rows = [...rowMap.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([rowLabel, seats]) => ({
-        rowLabel,
-        seats: [...seats].sort((a, b) => a.seatNumber - b.seatNumber),
-      }));
-
-    return {
-      ...section,
-      rows,
-    };
-  });
-});
-
-const selectedSeatIds = computed(() => new Set(selectedSeats.value.map((seat) => seat.id)));
-
-const totalPrice = computed(() => {
-  return selectedSeats.value.reduce((sum, seat) => sum + Number(seat.price || 0), 0);
-});
-
-const selectedSeatLabel = computed(() => {
-  if (selectedSeats.value.length === 0) return 'Chưa chọn ghế';
-
-  return [...selectedSeats.value]
-    .sort((a, b) => a.seatCode.localeCompare(b.seatCode))
-    .map((seat) => seat.seatCode)
-    .join(', ');
-});
-
-function sectionStyle(sectionName) {
-  const normalized = String(sectionName || '').toLowerCase();
-  if (normalized.includes('vip')) return 'vip';
-  if (normalized.includes('couple')) return 'couple';
-  return 'normal';
+function canSelectSeat(seat) {
+  return seat.status === "AVAILABLE";
 }
 
-function toggleSeat(seat, sectionName) {
-  if (seat.status !== 'AVAILABLE') return;
+function toggleSeat(seat) {
+  if (!canSelectSeat(seat)) return;
 
-  const seatIndex = selectedSeats.value.findIndex((item) => item.id === seat.id);
-  if (seatIndex >= 0) {
-    selectedSeats.value.splice(seatIndex, 1);
-    return;
+  const index = selectedSeats.value.findIndex((selected) => selected.id === seat.id);
+  if (index >= 0) {
+    selectedSeats.value.splice(index, 1);
+  } else {
+    selectedSeats.value.push(seat);
+  }
+}
+
+function seatClass(seat) {
+  if (seat.status === "SOLD") {
+    return "bg-red-100 border-red-300 text-red-700 cursor-not-allowed";
   }
 
-  selectedSeats.value.push({
-    ...seat,
-    sectionName,
-  });
-}
-
-async function resolveEventId() {
-  if (typeof route.query.eventId === 'string' && route.query.eventId.trim()) {
-    return route.query.eventId.trim();
+  if (seat.status === "LOCKED") {
+    return "bg-amber-100 border-amber-300 text-amber-700 cursor-not-allowed";
   }
 
-  const page = await getEvents({ page: 0, size: 1 });
-  return page?.content?.[0]?.id || null;
-}
-
-async function loadBookingEvent() {
-  loading.value = true;
-  error.value = '';
-  selectedSeats.value = [];
-
-  try {
-    const eventId = await resolveEventId();
-    if (!eventId) {
-      error.value = 'Chưa có sự kiện nào để đặt vé.';
-      bookingEvent.value = null;
-      return;
-    }
-
-    bookingEvent.value = await getBookingEvent(eventId);
-
-    if (route.query.eventId !== eventId) {
-      router.replace({ path: '/booking', query: { eventId } });
-    }
-  } catch {
-    error.value = 'Không tải được sơ đồ ghế. Vui lòng kiểm tra backend API.';
-    bookingEvent.value = null;
-  } finally {
-    loading.value = false;
+  if (isSeatSelected(seat.id)) {
+    return "bg-blue-500 border-blue-700 text-white shadow";
   }
+
+  if (seat.seatTypeCode === "VIP") {
+    return "bg-orange-100 border-orange-300 text-orange-700 hover:bg-orange-200";
+  }
+
+  if (seat.seatTypeCode === "COUPLE" || seat.seatTypeCode === "SWEETBOX") {
+    return "bg-rose-100 border-rose-300 text-rose-700 hover:bg-rose-200";
+  }
+
+  return "bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200";
 }
 
 function continueToCheckout() {
   if (!bookingEvent.value || selectedSeats.value.length === 0) return;
 
-  const payload = {
-    eventId: bookingEvent.value.eventId,
-    seatIds: selectedSeats.value.map((seat) => seat.id),
-    event: {
-      title: bookingEvent.value.title,
-      location: bookingEvent.value.location,
-      startTime: bookingEvent.value.startTime,
-      bannerUrl: bookingEvent.value.bannerUrl,
-    },
-  };
+  sessionStorage.setItem(
+    CHECKOUT_STORAGE_KEY,
+    JSON.stringify({
+      eventId: bookingEvent.value.eventId,
+      seatIds: selectedSeats.value.map((seat) => seat.id),
+    }),
+  );
 
-  sessionStorage.setItem(CHECKOUT_STORAGE_KEY, JSON.stringify(payload));
-  router.push('/checkout');
+  router.push("/checkout");
 }
 
-onMounted(loadBookingEvent);
+function startTimer() {
+  clearInterval(timerHandle);
+  timerSeconds.value = SELECT_TIMEOUT_SECONDS;
+
+  timerHandle = setInterval(() => {
+    if (timerSeconds.value <= 0) {
+      clearInterval(timerHandle);
+      selectedSeats.value = [];
+      return;
+    }
+    timerSeconds.value -= 1;
+  }, 1000);
+}
+
+async function loadBookingData() {
+  loading.value = true;
+  error.value = "";
+  selectedSeats.value = [];
+
+  try {
+    let eventId = route.query.eventId;
+    if (!eventId) {
+      const pageData = await getEvents({ page: 0, size: 1 });
+      eventId = pageData?.content?.[0]?.id;
+    }
+
+    if (!eventId) {
+      throw new Error("No event found");
+    }
+
+    bookingEvent.value = await getBookingEvent(eventId);
+    startTimer();
+  } catch {
+    bookingEvent.value = null;
+    error.value = "Unable to load seat map. Please check event/backend data.";
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(loadBookingData);
+onUnmounted(() => clearInterval(timerHandle));
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-100 text-slate-950 font-sans">
-    <section class="relative h-[250px] md:h-[320px] w-full overflow-hidden">
-      <div class="absolute inset-0">
-        <img
-          :src="bookingEvent?.bannerUrl || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1600&q=80'"
-          class="object-cover w-full h-full"
-          alt="Banner"
-        />
-        <div class="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 to-slate-950/30"></div>
-      </div>
+  <div class="min-h-screen bg-brand-light pb-20">
+    <section class="mx-auto max-w-7xl px-4 pt-8 md:px-8">
+      <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p class="text-sm font-black uppercase tracking-[0.2em] text-brand-orange">Booking</p>
+            <h1 class="mt-1 text-2xl font-black text-brand-navy md:text-3xl">
+              {{ bookingEvent?.title || "Choose Seats" }}
+            </h1>
+            <p class="mt-2 text-sm text-slate-500">
+              {{ eventDateLabel }} • {{ bookingEvent?.hallName || "Screen Room" }}
+            </p>
+          </div>
 
-      <div class="absolute inset-0 z-10 flex items-end px-6 md:px-12 pb-7">
-        <div class="max-w-6xl mx-auto w-full text-white drop-shadow-[0_3px_12px_rgba(0,0,0,0.85)]">
-          <p class="text-xs font-black tracking-[0.25em] uppercase text-brand-orange">Booking</p>
-          <h1 class="mt-2 text-2xl md:text-4xl font-black tracking-tight uppercase">
-            {{ bookingEvent?.title || 'Chọn ghế sự kiện' }}
-          </h1>
-          <p class="mt-2 text-slate-100 text-sm md:text-base font-semibold">
-            {{ bookingEvent?.location || '---' }}
-          </p>
+          <div class="grid gap-2 text-right">
+            <p class="text-sm font-bold text-slate-700">
+              Showtime: <span class="text-brand-navy">{{ showtimeLabel }}</span>
+            </p>
+            <p class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700">
+              Seat selection timer: {{ timeoutLabel }}
+            </p>
+          </div>
         </div>
       </div>
     </section>
 
-    <main class="max-w-7xl mx-auto py-8 px-4">
-      <div v-if="loading" class="bg-white rounded-3xl border border-slate-200 p-8 text-center font-bold text-slate-500">
-        Đang tải sơ đồ ghế...
+    <main class="mx-auto mt-6 max-w-7xl px-4 md:px-8">
+      <div
+        v-if="loading"
+        class="rounded-3xl border border-slate-200 bg-white p-8 text-center font-bold text-slate-500"
+      >
+        Loading seat map...
       </div>
 
-      <div v-else-if="error" class="bg-red-50 rounded-3xl border border-red-100 p-8 text-center font-bold text-red-700">
+      <div
+        v-else-if="error"
+        class="rounded-3xl border border-red-100 bg-red-50 p-8 text-center font-bold text-red-700"
+      >
         {{ error }}
       </div>
 
-      <template v-else-if="bookingEvent">
-        <div class="flex justify-center mb-10">
-          <div class="w-28 h-28 rounded-2xl border-2 bg-slate-900 border-slate-900 text-white shadow-lg flex flex-col items-center justify-center">
-            <span class="text-[10px] uppercase font-bold opacity-70">{{ eventDate.month }}</span>
-            <span class="text-3xl font-black my-1">{{ eventDate.day }}</span>
-            <span class="text-[11px] font-medium capitalize">{{ eventDate.weekday }}</span>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-[40px] p-8 md:p-12 border border-slate-200 shadow-sm">
-          <div class="relative w-full mb-14 flex flex-col items-center">
-            <div class="w-2/3 h-2 bg-slate-300 rounded-full shadow-[0_10px_20px_rgba(0,0,0,0.05)]"></div>
-            <span class="mt-4 text-slate-700 font-black tracking-[0.4em] text-xs uppercase">SCREEN</span>
+      <template v-else>
+        <div class="rounded-[2rem] border border-slate-200 bg-white px-4 pb-8 pt-6 shadow-sm md:px-8">
+          <div class="mx-auto mb-10 max-w-5xl">
+            <div class="h-4 rounded-full bg-gradient-to-b from-amber-300 via-amber-200 to-transparent"></div>
+            <p class="mt-3 text-center text-xs font-black uppercase tracking-[0.3em] text-slate-500">Screen</p>
           </div>
 
-          <div class="space-y-8">
-            <section v-for="section in sectionRows" :key="section.id">
-              <h3 class="text-sm font-black uppercase tracking-[0.2em] text-slate-600 mb-4">
-                {{ section.name }}
-              </h3>
-
-              <div class="overflow-x-auto pb-4">
-                <div class="min-w-[640px] flex flex-col gap-3">
-                  <div
-                    v-for="row in section.rows"
-                    :key="`${section.id}-${row.rowLabel}`"
-                    class="flex items-center gap-3"
-                  >
-                    <div class="w-6 text-xs font-black text-slate-700">{{ row.rowLabel }}</div>
-
-                    <div class="flex items-center gap-2">
-                      <button
-                        v-for="seat in row.seats"
-                        :key="seat.id"
-                        type="button"
-                        class="w-9 h-9 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-all duration-200 text-[10px] font-bold border-b-4"
-                        :class="[
-                          seat.status !== 'AVAILABLE' ? 'bg-slate-200 border-slate-300 text-slate-600 cursor-not-allowed' : '',
-                          seat.status === 'AVAILABLE' && !selectedSeatIds.has(seat.id) && sectionStyle(section.name) === 'normal' ? 'bg-white border-slate-300 text-slate-900 hover:bg-slate-100' : '',
-                          seat.status === 'AVAILABLE' && !selectedSeatIds.has(seat.id) && sectionStyle(section.name) === 'vip' ? 'bg-orange-100 border-orange-300 text-orange-900 hover:bg-orange-200' : '',
-                          seat.status === 'AVAILABLE' && !selectedSeatIds.has(seat.id) && sectionStyle(section.name) === 'couple' ? 'bg-red-100 border-red-300 text-red-900 hover:bg-red-200' : '',
-                          selectedSeatIds.has(seat.id) ? 'bg-blue-600 border-blue-800 text-white -translate-y-1 shadow-md' : ''
-                        ]"
-                        @click="toggleSeat(seat, section.name)"
-                      >
-                        <span v-if="seat.status === 'AVAILABLE'">{{ seat.seatCode }}</span>
-                        <span v-else>✖</span>
-                      </button>
-                    </div>
-
-                    <div class="w-6 text-xs font-black text-slate-700">{{ row.rowLabel }}</div>
-                  </div>
-                </div>
+          <div class="overflow-x-auto">
+            <div class="mx-auto min-w-[760px] max-w-4xl space-y-2">
+              <div
+                v-for="row in rowGroups"
+                :key="row.rowLabel"
+                class="flex items-center gap-2"
+              >
+                <div class="w-6 text-center text-xs font-black text-slate-500">{{ row.rowLabel }}</div>
+                <button
+                  v-for="seat in row.seats"
+                  :key="seat.id"
+                  type="button"
+                  :disabled="!canSelectSeat(seat)"
+                  @click="toggleSeat(seat)"
+                  class="h-10 w-10 rounded-lg border-b-[3px] text-[11px] font-bold transition"
+                  :class="seatClass(seat)"
+                >
+                  <span v-if="seat.status === 'SOLD'">★</span>
+                  <span v-else>{{ seat.seatCode }}</span>
+                </button>
+                <div class="w-6 text-center text-xs font-black text-slate-500">{{ row.rowLabel }}</div>
               </div>
-            </section>
+            </div>
           </div>
 
-          <div class="flex flex-wrap justify-center gap-8 mt-12 text-xs font-black text-slate-800 uppercase tracking-wider">
-            <div class="flex items-center gap-2"><div class="w-4 h-4 bg-white border border-slate-200 rounded"></div> Ghế thường</div>
-            <div class="flex items-center gap-2"><div class="w-4 h-4 bg-orange-100 border border-orange-200 rounded"></div> Ghế VIP</div>
-            <div class="flex items-center gap-2"><div class="w-4 h-4 bg-red-100 border border-red-200 rounded"></div> Ghế đôi</div>
-            <div class="flex items-center gap-2"><div class="w-4 h-4 bg-blue-600 rounded"></div> Đang chọn</div>
-            <div class="flex items-center gap-2"><div class="w-4 h-4 bg-slate-200 rounded"></div> Không khả dụng</div>
+          <div class="mt-8 flex flex-wrap justify-center gap-5 text-sm font-bold text-slate-700">
+            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-red-100 border border-red-300"></span> Booked</div>
+            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-blue-500"></span> Your selection</div>
+            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-slate-100 border border-slate-300"></span> Standard</div>
+            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-orange-100 border border-orange-300"></span> VIP</div>
+            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-rose-100 border border-rose-300"></span> Couple</div>
           </div>
         </div>
 
-        <div class="mt-8 bg-white border border-slate-100 rounded-3xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
-          <div class="flex items-center gap-6">
-            <div class="hidden sm:block p-4 bg-slate-100 rounded-2xl text-slate-800">🎟️</div>
+        <div class="mt-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <p class="text-xs font-black text-slate-700 uppercase mb-1">Ghế đã chọn</p>
-              <p class="text-xl font-black text-slate-900">{{ selectedSeatLabel }}</p>
+              <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500">Selected Seats</p>
+              <p class="mt-2 text-xl font-black text-brand-navy">
+                {{ selectedSeatCodes.length > 0 ? selectedSeatCodes.join(", ") : "No seats selected" }}
+              </p>
             </div>
-            <div class="h-10 w-[1px] bg-slate-100 mx-2 hidden md:block"></div>
             <div>
-              <p class="text-xs font-black text-slate-700 uppercase mb-1">Tổng thanh toán</p>
-              <p class="text-2xl font-black text-red-600">{{ formatPrice(totalPrice) }}</p>
+              <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500">Total</p>
+              <p class="mt-2 text-2xl font-black text-brand-orange">{{ formatMoney(totalPrice) }}</p>
             </div>
+            <button
+              type="button"
+              :disabled="selectedSeats.length === 0"
+              @click="continueToCheckout"
+              class="rounded-2xl bg-brand-navy px-8 py-4 text-sm font-black uppercase tracking-[0.2em] text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              Checkout
+            </button>
           </div>
-
-          <button
-            :disabled="selectedSeats.length === 0"
-            @click="continueToCheckout"
-            class="w-full md:w-auto px-12 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 transition-all shadow-lg"
-          >
-            Tiếp tục thanh toán
-          </button>
         </div>
       </template>
     </main>
   </div>
 </template>
-
-<style scoped>
-::-webkit-scrollbar {
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
-}
-</style>

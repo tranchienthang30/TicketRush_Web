@@ -55,9 +55,12 @@ const imageSrc = computed(() => {
 
       <div class="mt-auto flex justify-between items-center pt-4 border-t border-gray-50 dark:border-slate-700">
         <span class="text-brand-orange font-black text-xl">{{ event.price }}</span>
-        <button class="bg-brand-navy text-white px-4 py-2 rounded-lg hover:bg-brand-orange transition-all font-bold shadow-md active:scale-95">
+        <router-link
+          :to="`/booking?eventId=${event.id}`"
+          class="bg-brand-navy text-white px-4 py-2 rounded-lg hover:bg-brand-orange transition-all font-bold shadow-md active:scale-95"
+        >
           Booking
-        </button>
+        </router-link>
       </div>
     </div>
   </div>
