@@ -4,23 +4,24 @@
       <div>
         <h3 class="text-xl font-bold mb-4 text-brand-orange">STARLIGHT</h3>
         <p class="text-gray-300 text-sm leading-relaxed">
-          Nền tảng đặt vé và tổ chức sự kiện hàng đầu, mang đến cho bạn những trải nghiệm giải trí tuyệt vời nhất.
+          Your cinema ticketing home for movie showtimes, seat booking, and better
+          entertainment nights.
         </p>
       </div>
       <div>
         <h4 class="font-bold mb-4 uppercase tracking-wider">Liên hệ</h4>
         <ul class="space-y-2 text-sm text-gray-300">
-          <li>📍 Địa chỉ: 123 Đường ABC, Quận 1, TP. HCM</li>
-          <li>📞 SĐT: (028) 1234 5678</li>
-          <li>✉️ Email: support@ticketrush.vn</li>
+          <li>Address: 144 Xuan Thuy, Cau Giay, Ha Noi</li>
+          <li>Phone: +(84)6868686868</li>
+          <li>Email: phuocluuthang@gmail.com</li>
         </ul>
       </div>
       <div>
-        <h4 class="font-bold mb-4 uppercase tracking-wider">Hỗ trợ</h4>
+        <h4 class="font-bold mb-4 uppercase tracking-wider">You need help?</h4>
         <ul class="space-y-2 text-sm text-gray-300">
-          <li class="hover:text-brand-orange cursor-pointer">Quyền hỗ trợ khách hàng</li>
-          <li class="hover:text-brand-orange cursor-pointer">Điều khoản sử dụng</li>
-          <li class="hover:text-brand-orange cursor-pointer">Chính sách bảo mật</li>
+          <li class="hover:text-brand-orange cursor-pointer">Customer support rights</li>
+          <li class="hover:text-brand-orange cursor-pointer">Terms of Use</li>
+          <li class="hover:text-brand-orange cursor-pointer">Privacy Policy</li>
         </ul>
       </div>
     </div>

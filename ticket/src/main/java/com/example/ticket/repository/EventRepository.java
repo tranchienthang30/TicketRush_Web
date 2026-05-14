@@ -14,5 +14,5 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
 
     List<Event> findByStatusOrderByStartTimeAsc(EventStatus status);
 
-    List<Event> findByOrganizerIdOrderByCreatedAtDesc(UUID organizerId);
+    List<Event> findByProviderIdOrderByCreatedAtDesc(UUID providerId);
 }

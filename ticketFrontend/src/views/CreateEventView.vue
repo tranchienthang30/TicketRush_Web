@@ -14,7 +14,7 @@ const loading = ref(false);
 const error = ref("");
 const message = ref("");
 
-const organizationForm = reactive({
+const providerForm = reactive({
   name: "",
   businessEmail: "",
 });
@@ -42,8 +42,8 @@ const form = reactive({
   termsAccepted: false,
 });
 
-const isOrganizerReady = computed(() =>
-  ["ORGANIZER", "ADMIN"].includes(authStore.user?.role) && authStore.user?.primaryOrganizationId
+const isProviderReady = computed(() =>
+  ["PROVIDER", "ADMIN"].includes(authStore.user?.role) && authStore.user?.primaryOrganizationId
 );
 
 onMounted(async () => {
@@ -51,23 +51,23 @@ onMounted(async () => {
   categories.value = response.data;
 });
 
-async function requestOrganizationVerification() {
+async function requestProviderVerification() {
   error.value = "";
   message.value = "";
-  if (!organizationForm.name || !organizationForm.businessEmail) {
-    error.value = "Please enter organization name and business email.";
+  if (!providerForm.name || !providerForm.businessEmail) {
+    error.value = "Please enter provider name and business email.";
     return;
   }
 
   loading.value = true;
   try {
     const response = await organizationApi.registerOrganization({
-      name: organizationForm.name,
-      businessEmail: organizationForm.businessEmail,
+      name: providerForm.name,
+      businessEmail: providerForm.businessEmail,
     });
     message.value = response.data.message || "Verification email has been sent.";
   } catch (err) {
-    error.value = err.response?.data?.message || "Unable to request organization verification.";
+    error.value = err.response?.data?.message || "Unable to request provider verification.";
   } finally {
     loading.value = false;
   }
@@ -91,7 +91,7 @@ function removeSection(index) {
 function nextStep() {
   error.value = "";
   if (currentStep.value === 1 && !isStepOneValid()) {
-    error.value = "Please complete event information before continuing.";
+    error.value = "Please complete movie information before continuing.";
     return;
   }
   if (currentStep.value === 2 && !isStepTwoValid()) {
@@ -109,7 +109,7 @@ function previousStep() {
 async function submitEvent() {
   error.value = "";
   if (!form.termsAccepted) {
-    error.value = "You must accept the organizer terms before submitting.";
+    error.value = "You must accept the provider terms before submitting.";
     return;
   }
 
@@ -118,7 +118,7 @@ async function submitEvent() {
     const response = await eventApi.createEvent(toPayload());
     router.push(`/events?created=${response.data.slug}`);
   } catch (err) {
-    error.value = err.response?.data?.message || "Unable to create event.";
+    error.value = err.response?.data?.message || "Unable to create movie.";
   } finally {
     loading.value = false;
   }
@@ -173,20 +173,20 @@ function toInstant(value) {
 <template>
   <section class="min-h-screen bg-brand-light dark:bg-slate-900 px-4 py-8">
     <div class="max-w-7xl mx-auto">
-      <div v-if="!isOrganizerReady" class="max-w-2xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8">
-        <h1 class="text-3xl font-black text-brand-navy dark:text-white mb-3">Verify your organization</h1>
+      <div v-if="!isProviderReady" class="max-w-2xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8">
+        <h1 class="text-3xl font-black text-brand-navy dark:text-white mb-3">Verify your provider profile</h1>
         <p class="text-slate-500 dark:text-slate-400 mb-6">
-          To create events, verify a business email. After verification, your account becomes an organizer and you can continue creating events.
+          To create movies and showtimes, verify a business email. After verification, your account becomes a provider.
         </p>
 
-        <form class="space-y-5" @submit.prevent="requestOrganizationVerification">
+        <form class="space-y-5" @submit.prevent="requestProviderVerification">
           <label class="block">
-            <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Organization name</span>
-            <input v-model.trim="organizationForm.name" type="text" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30" />
+            <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Provider name</span>
+            <input v-model.trim="providerForm.name" type="text" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30" />
           </label>
           <label class="block">
             <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Business email</span>
-            <input v-model.trim="organizationForm.businessEmail" type="email" placeholder="events@company.com" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30" />
+            <input v-model.trim="providerForm.businessEmail" type="email" placeholder="movies@company.com" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30" />
           </label>
 
           <p v-if="message" class="text-sm text-green-700 bg-green-50 border border-green-100 rounded-xl px-4 py-3">{{ message }}</p>
@@ -200,10 +200,10 @@ function toInstant(value) {
 
       <div v-else class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
         <aside class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 h-fit sticky top-32">
-          <h2 class="font-black text-brand-navy dark:text-white mb-5">Create event</h2>
+          <h2 class="font-black text-brand-navy dark:text-white mb-5">Create movie</h2>
           <ol class="space-y-3">
             <li v-for="step in [
-              { id: 1, label: 'Event information' },
+              { id: 1, label: 'Movie information' },
               { id: 2, label: 'Seat setup' },
               { id: 3, label: 'Payment & confirmation' }
             ]" :key="step.id" class="flex items-center gap-3">
@@ -217,19 +217,19 @@ function toInstant(value) {
 
         <main class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm p-6 md:p-8">
           <div class="mb-6 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-5">
-            <h1 class="text-2xl font-black text-brand-navy dark:text-white mb-2">Organizer rules</h1>
+            <h1 class="text-2xl font-black text-brand-navy dark:text-white mb-2">Provider rules</h1>
             <ul class="text-sm text-slate-600 dark:text-slate-300 space-y-1 list-disc pl-5">
-              <li>Use accurate event information, official images, venue, and sale period.</li>
+              <li>Use accurate movie/showtime information, official images, venue, and sale period.</li>
               <li>Ticket sections and seat labels must match the actual venue setup.</li>
-              <li>Payout information must belong to the verified organization.</li>
-              <li>This MVP publishes events immediately; admin review will replace this later.</li>
+              <li>Payout information must belong to the verified provider profile.</li>
+              <li>This MVP publishes movies immediately; admin review will replace this later.</li>
             </ul>
           </div>
 
           <p v-if="error" class="mb-5 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">{{ error }}</p>
 
           <div v-if="currentStep === 1" class="space-y-5">
-            <h2 class="text-xl font-black text-slate-900 dark:text-white">Event information</h2>
+            <h2 class="text-xl font-black text-slate-900 dark:text-white">Movie information</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
               <label class="block md:col-span-2">
                 <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Title</span>
@@ -339,7 +339,7 @@ function toInstant(value) {
             </div>
             <label class="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
               <input v-model="form.termsAccepted" type="checkbox" class="mt-1" />
-              <span class="text-sm text-slate-600 dark:text-slate-300">I confirm the event information is accurate and accept TicketRush organizer terms. This MVP will publish the event immediately; admin approval will be added later.</span>
+              <span class="text-sm text-slate-600 dark:text-slate-300">I confirm the movie information is accurate and accept TicketRush provider terms. This MVP will publish the movie immediately; admin approval will be added later.</span>
             </label>
           </div>
 

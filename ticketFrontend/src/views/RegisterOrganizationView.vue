@@ -16,7 +16,7 @@ async function submit() {
   error.value = "";
 
   if (!form.name || !form.businessEmail) {
-    error.value = "Please enter organization name and business email.";
+    error.value = "Please enter provider name and business email.";
     return;
   }
 
@@ -28,7 +28,7 @@ async function submit() {
     });
     message.value = response.data.message || "Verification email has been sent.";
   } catch (err) {
-    error.value = err.response?.data?.message || "Unable to register organization.";
+    error.value = err.response?.data?.message || "Unable to register provider profile.";
   } finally {
     loading.value = false;
   }
@@ -38,14 +38,14 @@ async function submit() {
 <template>
   <div class="min-h-screen bg-brand-light dark:bg-slate-900 px-4 py-10">
     <div class="max-w-xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 p-8">
-      <h1 class="text-3xl font-black text-brand-navy dark:text-white mb-2">Register organization</h1>
+      <h1 class="text-3xl font-black text-brand-navy dark:text-white mb-2">Register provider profile</h1>
       <p class="text-slate-500 dark:text-slate-400 mb-8">
-        Verify a business email to become an organizer and manage events under your organization.
+        Verify a business email to become a provider and manage movies/showtimes for the system.
       </p>
 
       <form class="space-y-5" @submit.prevent="submit">
         <label class="block">
-          <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Organization name</span>
+          <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Provider name</span>
           <input v-model.trim="form.name" type="text" class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30" />
         </label>
 

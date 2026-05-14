@@ -81,6 +81,12 @@ public class User {
     @Column(name = "primary_organization_id")
     private UUID primaryOrganizationId;
 
+    @Column(name = "provider_request_status")
+    private String providerRequestStatus;
+
+    @Column(name = "provider_requested_at")
+    private Instant providerRequestedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

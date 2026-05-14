@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/organizations")
+@RequestMapping({"/api/providers", "/api/organizations"})
 public class OrganizationController {
     private final OrganizationService organizationService;
 
@@ -30,7 +30,7 @@ public class OrganizationController {
 
     @PostMapping("/verify")
     ApiResponse<OrganizationResponse> verify(@RequestParam String token) {
-        return ApiResponse.ok("Organization has been verified successfully.", organizationService.verifyOrganization(token));
+        return ApiResponse.ok("Provider profile has been verified successfully.", organizationService.verifyOrganization(token));
     }
 
     @GetMapping("/me")

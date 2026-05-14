@@ -34,6 +34,8 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST,
@@ -44,8 +46,11 @@ public class SecurityConfig {
                                 "/api/auth/forgot-password",
                                 "/api/auth/reset-password",
                                 "/api/auth/verify-email").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/organizations/verify").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/events/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/organizations/verify", "/api/providers/verify").permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/home",
+                                "/api/categories/**",
+                                "/api/events/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .anyRequest().authenticated()
                 )

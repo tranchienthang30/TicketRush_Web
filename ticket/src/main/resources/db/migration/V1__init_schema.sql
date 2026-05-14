@@ -23,7 +23,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE TYPE user_role AS ENUM (
     'CUSTOMER',
-    'ORGANIZER',
+    'PROVIDER',
     'ADMIN'
 );
 
@@ -158,7 +158,7 @@ CREATE INDEX idx_categories_is_active ON categories(is_active);
 CREATE TABLE events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    organizer_id UUID NOT NULL,
+    provider_id UUID NOT NULL,
     category_id BIGINT NOT NULL,
 
     title VARCHAR(255) NOT NULL,
@@ -181,8 +181,8 @@ CREATE TABLE events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT fk_events_organizer
-        FOREIGN KEY (organizer_id) REFERENCES users(id),
+    CONSTRAINT fk_events_provider
+        FOREIGN KEY (provider_id) REFERENCES users(id),
 
     CONSTRAINT fk_events_category
         FOREIGN KEY (category_id) REFERENCES categories(id),
@@ -197,7 +197,7 @@ CREATE TABLE events (
     )
 );
 
-CREATE INDEX idx_events_organizer_id ON events(organizer_id);
+CREATE INDEX idx_events_provider_id ON events(provider_id);
 CREATE INDEX idx_events_category_id ON events(category_id);
 CREATE INDEX idx_events_slug ON events(slug);
 CREATE INDEX idx_events_status ON events(status);
@@ -205,7 +205,7 @@ CREATE INDEX idx_events_city ON events(city);
 CREATE INDEX idx_events_start_time ON events(start_time);
 CREATE INDEX idx_events_status_start_time ON events(status, start_time);
 CREATE INDEX idx_events_category_status ON events(category_id, status);
-CREATE INDEX idx_events_organizer_status ON events(organizer_id, status);
+CREATE INDEX idx_events_provider_status ON events(provider_id, status);
 
 -- Useful for header search / event search.
 CREATE INDEX idx_events_title_trgm
@@ -596,7 +596,7 @@ CREATE INDEX idx_voucher_redemptions_order_id ON voucher_redemptions(order_id);
 
 COMMENT ON TABLE users IS 'User account, profile, role and OAuth identity in one table for MVP simplicity.';
 COMMENT ON TABLE categories IS 'Event categories. Each event belongs to one category in the simplified model.';
-COMMENT ON TABLE events IS 'Events created by organizers and managed by admins.';
+COMMENT ON TABLE events IS 'Movies/showtimes created by providers and managed by admins.';
 COMMENT ON TABLE event_sections IS 'Seat sections for each event, such as VIP, A, B.';
 COMMENT ON TABLE event_seats IS 'Core booking table. Seat status is managed here with transaction and row locking.';
 COMMENT ON TABLE orders IS 'Mock checkout order. PENDING orders hold seats; PAID orders issue tickets.';

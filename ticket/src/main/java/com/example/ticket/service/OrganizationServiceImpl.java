@@ -62,7 +62,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         emailService.sendOrganizationVerificationEmail(
                 businessEmail,
                 request.name().trim(),
-                frontendUrl + "/organization/verify?token=" + token
+                frontendUrl + "/provider/verify?token=" + token
         );
     }
 
@@ -71,12 +71,12 @@ public class OrganizationServiceImpl implements OrganizationService {
     public OrganizationResponse verifyOrganization(String token) {
         String payload = tokenService.consumeToken(TOKEN_KEY_PREFIX, token);
         if (payload == null) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Organization verification token is invalid or expired");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Provider verification token is invalid or expired");
         }
 
         String[] parts = payload.split("\\|", 3);
         if (parts.length != 3) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Organization verification token is invalid");
+            throw new AppException(HttpStatus.BAD_REQUEST, "Provider verification token is invalid");
         }
 
         UUID userId = UUID.fromString(parts[0]);
@@ -97,7 +97,7 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .verifiedAt(Instant.now())
                 .build());
 
-        user.setRole(UserRole.ORGANIZER);
+        user.setRole(UserRole.PROVIDER);
         user.setPrimaryOrganizationId(organization.getId());
         userRepository.save(user);
 

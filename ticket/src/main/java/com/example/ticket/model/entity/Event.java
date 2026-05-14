@@ -37,8 +37,8 @@ public class Event {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "organizer_id", nullable = false)
-    private UUID organizerId;
+    @Column(name = "provider_id", nullable = false)
+    private UUID providerId;
 
     @Column(name = "organization_id")
     private UUID organizationId;
@@ -97,8 +97,8 @@ public class Event {
     @Column(name = "payout_account_number")
     private String payoutAccountNumber;
 
-    @Column(name = "organizer_terms_accepted_at")
-    private Instant organizerTermsAcceptedAt;
+    @Column(name = "provider_terms_accepted_at")
+    private Instant providerTermsAcceptedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

@@ -13,7 +13,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   const isLoggedIn = computed(() => Boolean(user.value));
   const isAuthenticated = isLoggedIn;
-  const isOrganizer = computed(() => ["ORGANIZER", "ADMIN"].includes(user.value?.role));
+  const isProvider = computed(() => ["PROVIDER", "ADMIN"].includes(user.value?.role));
   const isCustomer = computed(() => user.value?.role === "CUSTOMER");
 
   async function registerUser(payload) {
@@ -100,7 +100,7 @@ export const useAuthStore = defineStore("auth", () => {
     hasCheckedAuth,
     isLoggedIn,
     isAuthenticated,
-    isOrganizer,
+    isProvider,
     isCustomer,
     registerUser,
     loginUser,

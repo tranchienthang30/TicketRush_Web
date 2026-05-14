@@ -18,7 +18,9 @@ public record UserResponse(
         AuthProvider provider,
         Instant sessionExpiresAt,
         boolean emailVerified,
-        UUID primaryOrganizationId
+        UUID primaryOrganizationId,
+        String providerRequestStatus,
+        Instant providerRequestedAt
 ) {
     public static UserResponse from(User user) {
         return from(user, null);
@@ -36,7 +38,9 @@ public record UserResponse(
                 user.getProvider(),
                 sessionExpiresAt,
                 Boolean.TRUE.equals(user.getEmailVerified()),
-                user.getPrimaryOrganizationId()
+                user.getPrimaryOrganizationId(),
+                user.getProviderRequestStatus(),
+                user.getProviderRequestedAt()
         );
     }
 }

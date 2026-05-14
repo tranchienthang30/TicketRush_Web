@@ -46,7 +46,7 @@ async function handleLogin() {
           Welcome back
         </h1>
         <p class="text-gray-500 dark:text-gray-400 mt-2">
-          Sign in to book tickets and manage your events.
+          Sign in to book movie seats and manage your tickets.
         </p>
       </div>
 
@@ -77,7 +77,7 @@ async function handleLogin() {
             v-model="form.password"
             type="password"
             autocomplete="current-password"
-            placeholder="••••••••"
+            placeholder="At least 8 characters"
             class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30"
           />
         </div>

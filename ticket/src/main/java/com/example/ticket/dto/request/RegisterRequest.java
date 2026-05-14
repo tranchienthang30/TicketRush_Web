@@ -20,8 +20,11 @@ public record RegisterRequest(
         String fullName,
 
         @Size(max = 30, message = "Phone must be at most 30 characters")
+        @Pattern(regexp = "^(\\+?\\d{8,15})?$", message = "Phone must contain only digits and may start with +")
         String phone,
 
-        String recaptchaToken
+        String recaptchaToken,
+
+        Boolean requestProviderAccess
 ) {
 }

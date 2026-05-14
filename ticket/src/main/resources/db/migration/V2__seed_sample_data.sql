@@ -19,7 +19,7 @@ INSERT INTO users (
 )
 VALUES
     ('00000000-0000-0000-0000-000000000001', 'admin@ticketrush.local', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'TicketRush Admin', NULL, '0900000001', 'OTHER', '1995-01-01', 'ADMIN', 'ACTIVE', 'LOCAL', NULL, now(), now()),
-    ('00000000-0000-0000-0000-000000000002', 'organizer@ticketrush.local', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Event Organizer', NULL, '0900000002', 'MALE', '1997-04-12', 'ORGANIZER', 'ACTIVE', 'LOCAL', NULL, now(), now()),
+    ('00000000-0000-0000-0000-000000000002', 'provider@ticketrush.local', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Movie Provider', NULL, '0900000002', 'MALE', '1997-04-12', 'PROVIDER', 'ACTIVE', 'LOCAL', NULL, now(), now()),
     ('00000000-0000-0000-0000-000000000003', 'customer1@ticketrush.local', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Nguyen An', NULL, '0900000003', 'FEMALE', '2001-08-20', 'CUSTOMER', 'ACTIVE', 'LOCAL', NULL, now(), now()),
     ('00000000-0000-0000-0000-000000000004', 'customer2@ticketrush.local', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Tran Binh', NULL, '0900000004', 'MALE', '1999-11-05', 'CUSTOMER', 'ACTIVE', 'LOCAL', NULL, now(), now())
 ON CONFLICT DO NOTHING;
@@ -83,7 +83,7 @@ ON CONFLICT DO NOTHING;
 -- EVENTS
 -- =========================================================
 INSERT INTO events (
-    id, organizer_id, category_id, title, slug, description, banner_url,
+    id, provider_id, category_id, title, slug, description, banner_url,
     location_name, address, city, start_time, end_time, sale_start_time, sale_end_time,
     status, created_at, updated_at
 )
@@ -204,4 +204,3 @@ INSERT INTO voucher_redemptions (id, voucher_id, user_id, order_id, discount_amo
 VALUES
     ('80000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003', '50000000-0000-0000-0000-000000000001', 200000, now() - interval '1 day')
 ON CONFLICT DO NOTHING;
-

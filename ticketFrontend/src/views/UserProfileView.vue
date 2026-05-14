@@ -60,14 +60,14 @@ async function resendVerification() {
       >
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p class="font-black text-slate-900 dark:text-white">Want to create events?</p>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Register an organization with a business email to become an organizer.</p>
+            <p class="font-black text-slate-900 dark:text-white">Want to create movies?</p>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Register a provider profile with a business email to manage movies and showtimes.</p>
           </div>
           <RouterLink
-            to="/organization/register"
+            to="/provider/register"
             class="rounded-xl bg-brand-orange px-4 py-2 text-center font-bold text-white hover:bg-orange-600"
           >
-            Register organization
+            Register provider
           </RouterLink>
         </div>
       </div>
@@ -135,7 +135,7 @@ async function resendVerification() {
           </label>
 
           <label class="block">
-            <span class="block text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">Organization</span>
+            <span class="block text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">Provider profile</span>
             <input
               :value="user?.primaryOrganizationId || 'None'"
               disabled
