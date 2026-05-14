@@ -83,7 +83,12 @@ public class EventService {
                                 row.seatNumber(),
                                 row.seatCode(),
                                 row.price(),
-                                row.status()
+                                row.status(),
+                                row.seatTypeCode(),
+                                row.layoutX(),
+                                row.layoutY(),
+                                row.hidden(),
+                                row.accessible()
                         ), Collectors.toList())
                 ));
 
@@ -105,6 +110,7 @@ public class EventService {
                 event.title(),
                 event.bannerUrl(),
                 event.location(),
+                event.hallName(),
                 event.status(),
                 event.startTime(),
                 event.saleStartTime(),

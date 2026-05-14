@@ -10,6 +10,11 @@ public record BookingSeatResponse(
         int seatNumber,
         String seatCode,
         BigDecimal price,
-        String status
+        String status,
+        String seatTypeCode,
+        Integer layoutX,
+        Integer layoutY,
+        boolean hidden,
+        boolean accessible
 ) {
 }
