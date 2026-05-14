@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -71,6 +72,57 @@ public class EventQueryRepository {
 
         Long total = jdbcTemplate.queryForObject(sql, buildEventParams(categoryId, query, city), Long.class);
         return total == null ? 0 : total;
+    }
+
+    public Optional<BookingEventRow> findPublishedEventForBooking(UUID eventId) {
+        String sql = """
+                SELECT
+                    e.id,
+                    e.slug,
+                    e.title,
+                    e.banner_url,
+                    COALESCE(NULLIF(e.location_name, ''), NULLIF(e.city, ''), e.address) AS location,
+                    e.status::text AS status,
+                    e.start_time,
+                    e.sale_start_time,
+                    e.sale_end_time,
+                    (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'AVAILABLE') AS available_seats,
+                    (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'SOLD') AS sold_seats
+                FROM events e
+                WHERE e.id = :eventId
+                AND e.status = 'PUBLISHED'
+                """;
+
+        List<BookingEventRow> rows = jdbcTemplate.query(sql,
+                new MapSqlParameterSource("eventId", eventId),
+                this::mapBookingEventRow);
+        return rows.stream().findFirst();
+    }
+
+    public List<BookingSectionRow> findSectionsByEvent(UUID eventId) {
+        String sql = """
+                SELECT id, event_id, name, base_price, row_count, seats_per_row, display_order
+                FROM event_sections
+                WHERE event_id = :eventId
+                ORDER BY display_order ASC, name ASC
+                """;
+
+        return jdbcTemplate.query(sql,
+                new MapSqlParameterSource("eventId", eventId),
+                this::mapBookingSectionRow);
+    }
+
+    public List<BookingSeatRow> findSeatsByEvent(UUID eventId) {
+        String sql = """
+                SELECT id, event_id, section_id, row_label, seat_number, seat_code, price, status::text AS status
+                FROM event_seats
+                WHERE event_id = :eventId
+                ORDER BY section_id ASC, row_label ASC, seat_number ASC
+                """;
+
+        return jdbcTemplate.query(sql,
+                new MapSqlParameterSource("eventId", eventId),
+                this::mapBookingSeatRow);
     }
 
     private String baseEventSql(String extraWhereAndOrder) {
@@ -154,6 +206,47 @@ public class EventQueryRepository {
         );
     }
 
+    private BookingEventRow mapBookingEventRow(ResultSet rs, int rowNum) throws SQLException {
+        return new BookingEventRow(
+                rs.getObject("id", UUID.class),
+                rs.getString("slug"),
+                rs.getString("title"),
+                rs.getString("banner_url"),
+                rs.getString("location"),
+                rs.getString("status"),
+                rs.getObject("start_time", OffsetDateTime.class),
+                rs.getObject("sale_start_time", OffsetDateTime.class),
+                rs.getObject("sale_end_time", OffsetDateTime.class),
+                rs.getLong("available_seats"),
+                rs.getLong("sold_seats")
+        );
+    }
+
+    private BookingSectionRow mapBookingSectionRow(ResultSet rs, int rowNum) throws SQLException {
+        return new BookingSectionRow(
+                rs.getObject("id", UUID.class),
+                rs.getObject("event_id", UUID.class),
+                rs.getString("name"),
+                rs.getBigDecimal("base_price"),
+                rs.getInt("row_count"),
+                rs.getInt("seats_per_row"),
+                rs.getInt("display_order")
+        );
+    }
+
+    private BookingSeatRow mapBookingSeatRow(ResultSet rs, int rowNum) throws SQLException {
+        return new BookingSeatRow(
+                rs.getObject("id", UUID.class),
+                rs.getObject("event_id", UUID.class),
+                rs.getObject("section_id", UUID.class),
+                rs.getString("row_label"),
+                rs.getInt("seat_number"),
+                rs.getString("seat_code"),
+                rs.getBigDecimal("price"),
+                rs.getString("status")
+        );
+    }
+
     public record EventRow(
             UUID id,
             String slug,
@@ -167,6 +260,44 @@ public class EventQueryRepository {
             BigDecimal minPrice,
             long availableSeats,
             long soldSeats
+    ) {
+    }
+
+    public record BookingEventRow(
+            UUID id,
+            String slug,
+            String title,
+            String bannerUrl,
+            String location,
+            String status,
+            OffsetDateTime startTime,
+            OffsetDateTime saleStartTime,
+            OffsetDateTime saleEndTime,
+            long availableSeats,
+            long soldSeats
+    ) {
+    }
+
+    public record BookingSectionRow(
+            UUID id,
+            UUID eventId,
+            String name,
+            BigDecimal basePrice,
+            int rowCount,
+            int seatsPerRow,
+            int displayOrder
+    ) {
+    }
+
+    public record BookingSeatRow(
+            UUID id,
+            UUID eventId,
+            UUID sectionId,
+            String rowLabel,
+            int seatNumber,
+            String seatCode,
+            BigDecimal price,
+            String status
     ) {
     }
 }
