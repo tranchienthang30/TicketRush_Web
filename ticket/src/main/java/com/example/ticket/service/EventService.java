@@ -2,9 +2,14 @@ package com.example.ticket.service;
 
 import com.example.ticket.dto.CategoryEventsResponse;
 import com.example.ticket.dto.CategoryResponse;
+import com.example.ticket.dto.BookingEventResponse;
+import com.example.ticket.dto.BookingSectionResponse;
+import com.example.ticket.dto.BookingSeatResponse;
 import com.example.ticket.dto.EventCardResponse;
 import com.example.ticket.dto.EventPageResponse;
+import com.example.ticket.exception.ApiException;
 import com.example.ticket.repository.EventQueryRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -14,6 +19,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class EventService {
@@ -58,6 +66,53 @@ public class EventService {
         );
 
         return new EventPageResponse(content, safePage, safeSize, total, totalPages);
+    }
+
+    public BookingEventResponse getBookingEvent(UUID eventId) {
+        EventQueryRepository.BookingEventRow event = eventRepository.findPublishedEventForBooking(eventId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
+
+        List<EventQueryRepository.BookingSectionRow> sections = eventRepository.findSectionsByEvent(eventId);
+        Map<UUID, List<BookingSeatResponse>> seatsBySection = eventRepository.findSeatsByEvent(eventId).stream()
+                .collect(Collectors.groupingBy(
+                        EventQueryRepository.BookingSeatRow::sectionId,
+                        Collectors.mapping(row -> new BookingSeatResponse(
+                                row.id(),
+                                row.sectionId(),
+                                row.rowLabel(),
+                                row.seatNumber(),
+                                row.seatCode(),
+                                row.price(),
+                                row.status()
+                        ), Collectors.toList())
+                ));
+
+        List<BookingSectionResponse> sectionResponses = sections.stream()
+                .map(section -> new BookingSectionResponse(
+                        section.id(),
+                        section.name(),
+                        section.basePrice(),
+                        section.rowCount(),
+                        section.seatsPerRow(),
+                        section.displayOrder(),
+                        seatsBySection.getOrDefault(section.id(), List.of())
+                ))
+                .toList();
+
+        return new BookingEventResponse(
+                event.id(),
+                event.slug(),
+                event.title(),
+                event.bannerUrl(),
+                event.location(),
+                event.status(),
+                event.startTime(),
+                event.saleStartTime(),
+                event.saleEndTime(),
+                event.availableSeats(),
+                event.soldSeats(),
+                sectionResponses
+        );
     }
 
     private List<EventCardResponse> toEventCards(List<EventQueryRepository.EventRow> rows) {

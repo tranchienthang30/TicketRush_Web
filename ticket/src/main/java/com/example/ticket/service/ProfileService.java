@@ -5,6 +5,8 @@ import com.example.ticket.dto.OrderSummaryResponse;
 import com.example.ticket.dto.ProfileDashboardResponse;
 import com.example.ticket.dto.ProfileResponse;
 import com.example.ticket.dto.StatResponse;
+import com.example.ticket.dto.TicketDetailItemResponse;
+import com.example.ticket.dto.TicketDetailResponse;
 import com.example.ticket.dto.TicketSummaryResponse;
 import com.example.ticket.dto.UpdateProfileRequest;
 import com.example.ticket.exception.ApiException;
@@ -19,6 +21,7 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -27,6 +30,7 @@ import java.util.UUID;
 public class ProfileService {
     private static final ZoneId APP_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MMM dd, yyyy", Locale.ENGLISH);
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm", Locale.ENGLISH);
     private static final Locale VIETNAM = Locale.forLanguageTag("vi-VN");
 
     private final ProfileQueryRepository profileRepository;
@@ -95,6 +99,41 @@ public class ProfileService {
                 .toList();
     }
 
+    public TicketDetailResponse getTicketDetail(UUID userId, UUID orderId) {
+        ProfileQueryRepository.TicketDetailHeaderRow header = profileRepository.findTicketDetailHeader(userId, orderId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Ticket order not found"));
+
+        List<TicketDetailItemResponse> items = profileRepository.findTicketDetailItems(userId, orderId).stream()
+                .map(item -> new TicketDetailItemResponse(
+                        item.orderItemId(),
+                        item.seatId(),
+                        item.seatCode(),
+                        item.ticketStatus(),
+                        item.priceSnapshot(),
+                        item.qrCode(),
+                        buildQrContent(header, item),
+                        item.issuedAt(),
+                        item.checkedInAt()
+                ))
+                .toList();
+
+        return new TicketDetailResponse(
+                header.orderId(),
+                header.eventId(),
+                header.eventSlug(),
+                header.title(),
+                header.location(),
+                formatDateTime(header.startTime()),
+                header.startTime(),
+                header.orderStatus(),
+                header.totalAmount(),
+                formatMoney(header.totalAmount()),
+                header.createdAt(),
+                header.paidAt(),
+                items
+        );
+    }
+
     private List<StatResponse> getStats(UUID userId) {
         ProfileQueryRepository.ProfileStatsRow stats = profileRepository.findStats(userId);
         return List.of(
@@ -116,6 +155,13 @@ public class ProfileService {
             return "";
         }
         return dateTime.atZoneSameInstant(APP_ZONE).format(DATE_FORMATTER);
+    }
+
+    private String formatDateTime(OffsetDateTime dateTime) {
+        if (dateTime == null) {
+            return "";
+        }
+        return dateTime.atZoneSameInstant(APP_ZONE).format(DATE_TIME_FORMATTER);
     }
 
     private String formatMoney(BigDecimal value) {
@@ -149,5 +195,23 @@ public class ProfileService {
 
     private int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private String buildQrContent(
+            ProfileQueryRepository.TicketDetailHeaderRow header,
+            ProfileQueryRepository.TicketDetailItemRow item
+    ) {
+        List<String> parts = new ArrayList<>();
+        parts.add("TR-TICKET");
+        parts.add(header.orderId().toString());
+        parts.add(header.eventId().toString());
+        parts.add(item.seatCode());
+        parts.add(item.ticketStatus());
+
+        if (item.qrCode() != null && !item.qrCode().isBlank()) {
+            parts.add(item.qrCode());
+        }
+
+        return String.join("|", parts);
     }
 }
