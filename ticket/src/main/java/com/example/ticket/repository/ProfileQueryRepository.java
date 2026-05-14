@@ -135,6 +135,58 @@ public class ProfileQueryRepository {
                 .addValue("limit", limit), this::mapTicketRow);
     }
 
+    public Optional<TicketDetailHeaderRow> findTicketDetailHeader(UUID userId, UUID orderId) {
+        String sql = """
+                SELECT
+                    o.id AS order_id,
+                    e.id AS event_id,
+                    e.slug AS event_slug,
+                    e.title,
+                    e.start_time,
+                    COALESCE(NULLIF(e.location_name, ''), NULLIF(e.city, ''), e.address) AS location,
+                    o.status::text AS order_status,
+                    o.total_amount,
+                    o.created_at,
+                    o.paid_at
+                FROM orders o
+                JOIN events e ON e.id = o.event_id
+                WHERE o.id = :orderId
+                AND o.user_id = :userId
+                LIMIT 1
+                """;
+
+        List<TicketDetailHeaderRow> rows = jdbcTemplate.query(sql,
+                new MapSqlParameterSource()
+                        .addValue("orderId", orderId)
+                        .addValue("userId", userId),
+                this::mapTicketDetailHeaderRow);
+        return rows.stream().findFirst();
+    }
+
+    public List<TicketDetailItemRow> findTicketDetailItems(UUID userId, UUID orderId) {
+        String sql = """
+                SELECT
+                    oi.id AS order_item_id,
+                    oi.event_seat_id,
+                    es.seat_code,
+                    oi.ticket_status::text AS ticket_status,
+                    oi.price_snapshot,
+                    oi.qr_code,
+                    oi.issued_at,
+                    oi.checked_in_at
+                FROM order_items oi
+                JOIN event_seats es ON es.id = oi.event_seat_id
+                JOIN orders o ON o.id = oi.order_id
+                WHERE oi.order_id = :orderId
+                AND o.user_id = :userId
+                ORDER BY es.seat_code ASC
+                """;
+
+        return jdbcTemplate.query(sql, new MapSqlParameterSource()
+                .addValue("orderId", orderId)
+                .addValue("userId", userId), this::mapTicketDetailItemRow);
+    }
+
     public List<OrderRow> findOrders(UUID userId) {
         String sql = """
                 SELECT
@@ -239,6 +291,34 @@ public class ProfileQueryRepository {
         );
     }
 
+    private TicketDetailHeaderRow mapTicketDetailHeaderRow(ResultSet rs, int rowNum) throws SQLException {
+        return new TicketDetailHeaderRow(
+                rs.getObject("order_id", UUID.class),
+                rs.getObject("event_id", UUID.class),
+                rs.getString("event_slug"),
+                rs.getString("title"),
+                rs.getObject("start_time", OffsetDateTime.class),
+                rs.getString("location"),
+                rs.getString("order_status"),
+                rs.getBigDecimal("total_amount"),
+                rs.getObject("created_at", OffsetDateTime.class),
+                rs.getObject("paid_at", OffsetDateTime.class)
+        );
+    }
+
+    private TicketDetailItemRow mapTicketDetailItemRow(ResultSet rs, int rowNum) throws SQLException {
+        return new TicketDetailItemRow(
+                rs.getObject("order_item_id", UUID.class),
+                rs.getObject("event_seat_id", UUID.class),
+                rs.getString("seat_code"),
+                rs.getString("ticket_status"),
+                rs.getBigDecimal("price_snapshot"),
+                rs.getString("qr_code"),
+                rs.getObject("issued_at", OffsetDateTime.class),
+                rs.getObject("checked_in_at", OffsetDateTime.class)
+        );
+    }
+
     public record ProfileStatsRow(
             long ticketsBooked,
             long upcomingEvents,
@@ -271,6 +351,32 @@ public class ProfileQueryRepository {
             BigDecimal totalAmount,
             OffsetDateTime createdAt,
             OffsetDateTime paidAt
+    ) {
+    }
+
+    public record TicketDetailHeaderRow(
+            UUID orderId,
+            UUID eventId,
+            String eventSlug,
+            String title,
+            OffsetDateTime startTime,
+            String location,
+            String orderStatus,
+            BigDecimal totalAmount,
+            OffsetDateTime createdAt,
+            OffsetDateTime paidAt
+    ) {
+    }
+
+    public record TicketDetailItemRow(
+            UUID orderItemId,
+            UUID seatId,
+            String seatCode,
+            String ticketStatus,
+            BigDecimal priceSnapshot,
+            String qrCode,
+            OffsetDateTime issuedAt,
+            OffsetDateTime checkedInAt
     ) {
     }
 
