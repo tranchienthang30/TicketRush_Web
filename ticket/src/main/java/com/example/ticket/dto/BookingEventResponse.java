@@ -10,6 +10,7 @@ public record BookingEventResponse(
         String title,
         String bannerUrl,
         String location,
+        String hallName,
         String status,
         OffsetDateTime startTime,
         OffsetDateTime saleStartTime,

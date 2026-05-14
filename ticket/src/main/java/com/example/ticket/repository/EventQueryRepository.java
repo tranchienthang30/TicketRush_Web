@@ -82,6 +82,7 @@ public class EventQueryRepository {
                     e.title,
                     e.banner_url,
                     COALESCE(NULLIF(e.location_name, ''), NULLIF(e.city, ''), e.address) AS location,
+                    ch.name AS hall_name,
                     e.status::text AS status,
                     e.start_time,
                     e.sale_start_time,
@@ -89,6 +90,7 @@ public class EventQueryRepository {
                     (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'AVAILABLE') AS available_seats,
                     (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'SOLD') AS sold_seats
                 FROM events e
+                LEFT JOIN cinema_halls ch ON ch.id = e.hall_id
                 WHERE e.id = :eventId
                 AND e.status = 'PUBLISHED'
                 """;
@@ -114,10 +116,23 @@ public class EventQueryRepository {
 
     public List<BookingSeatRow> findSeatsByEvent(UUID eventId) {
         String sql = """
-                SELECT id, event_id, section_id, row_label, seat_number, seat_code, price, status::text AS status
+                SELECT
+                    id,
+                    event_id,
+                    section_id,
+                    row_label,
+                    seat_number,
+                    seat_code,
+                    price,
+                    status::text AS status,
+                    COALESCE(seat_type_code, 'STANDARD') AS seat_type_code,
+                    layout_x,
+                    layout_y,
+                    is_hidden,
+                    is_accessible
                 FROM event_seats
                 WHERE event_id = :eventId
-                ORDER BY section_id ASC, row_label ASC, seat_number ASC
+                ORDER BY row_label ASC, seat_number ASC
                 """;
 
         return jdbcTemplate.query(sql,
@@ -213,6 +228,7 @@ public class EventQueryRepository {
                 rs.getString("title"),
                 rs.getString("banner_url"),
                 rs.getString("location"),
+                rs.getString("hall_name"),
                 rs.getString("status"),
                 rs.getObject("start_time", OffsetDateTime.class),
                 rs.getObject("sale_start_time", OffsetDateTime.class),
@@ -243,7 +259,12 @@ public class EventQueryRepository {
                 rs.getInt("seat_number"),
                 rs.getString("seat_code"),
                 rs.getBigDecimal("price"),
-                rs.getString("status")
+                rs.getString("status"),
+                rs.getString("seat_type_code"),
+                rs.getObject("layout_x", Integer.class),
+                rs.getObject("layout_y", Integer.class),
+                rs.getBoolean("is_hidden"),
+                rs.getBoolean("is_accessible")
         );
     }
 
@@ -269,6 +290,7 @@ public class EventQueryRepository {
             String title,
             String bannerUrl,
             String location,
+            String hallName,
             String status,
             OffsetDateTime startTime,
             OffsetDateTime saleStartTime,
@@ -297,7 +319,12 @@ public class EventQueryRepository {
             int seatNumber,
             String seatCode,
             BigDecimal price,
-            String status
+            String status,
+            String seatTypeCode,
+            Integer layoutX,
+            Integer layoutY,
+            boolean hidden,
+            boolean accessible
     ) {
     }
 }
