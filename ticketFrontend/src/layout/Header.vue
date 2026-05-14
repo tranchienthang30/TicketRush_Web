@@ -16,7 +16,7 @@ const currentUser = ref({
 
 const navItems = [
   { name: 'Home', path: '/' },
-  { name: 'Events', path: '/events' },
+  { name: 'Movies', path: '/events' },
   { name: 'Booking', path: '/booking' },
   { name: 'My Tickets', path: '/my-tickets' },
   { name: 'Membership', path: '/membership' },
@@ -70,7 +70,7 @@ onUnmounted(() => window.removeEventListener('click', closeMenu))
       <div class="hidden md:flex flex-1 mx-10">
         <input
           type="text"
-          placeholder="Events..."
+          placeholder="Movies..."
           class="w-full max-w-md px-5 py-2 rounded-full text-slate-900 focus:outline-none focus:ring-4 focus:ring-brand-orange/50 transition-all text-base"
         />
       </div>

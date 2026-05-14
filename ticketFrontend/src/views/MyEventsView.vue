@@ -1,9 +1,9 @@
 <template>
   <div class="max-w-5xl mx-auto p-6">
-    <h1 class="text-3xl font-bold mb-6">My Events</h1>
+    <h1 class="text-3xl font-bold mb-6">My Screenings</h1>
 
     <div v-if="events.length === 0" class="text-gray-500">
-      You have not created any events yet.
+      You have not created any screenings yet.
     </div>
 
     <div class="grid gap-4">
@@ -11,7 +11,7 @@
         <div>
           <h2 class="text-xl font-bold">{{ event.title }}</h2>
           <p class="text-gray-500">Start: {{ event.startTime }} | End: {{ event.endTime }}</p>
-          <p class="text-gray-500">Tickets left: {{ event.totalTickets }}</p>
+          <p class="text-gray-500">Seats left: {{ event.totalTickets }}</p>
         </div>
         <div class="flex gap-2">
           <button class="bg-blue-500 text-white px-4 py-2 rounded">View</button>

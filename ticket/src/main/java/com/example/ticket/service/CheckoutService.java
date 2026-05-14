@@ -134,7 +134,7 @@ public class CheckoutService {
         List<UUID> seatIds = new ArrayList<>(uniqueSeatIds);
 
         CheckoutQueryRepository.EventCheckoutRow event = checkoutRepository.findPublishedEvent(eventId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Movie not found"));
 
         List<CheckoutQueryRepository.SeatCheckoutRow> seats = checkoutRepository.findSeatsByIds(seatIds);
         if (seats.size() != seatIds.size()) {
@@ -143,7 +143,7 @@ public class CheckoutService {
 
         for (CheckoutQueryRepository.SeatCheckoutRow seat : seats) {
             if (!eventId.equals(seat.eventId())) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Selected seats must belong to the same event");
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Selected seats must belong to the same movie");
             }
             if (!"AVAILABLE".equalsIgnoreCase(seat.status())) {
                 throw new ApiException(HttpStatus.CONFLICT, "Seat " + seat.seatCode() + " is not available");

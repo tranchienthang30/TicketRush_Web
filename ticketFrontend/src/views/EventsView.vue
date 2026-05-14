@@ -14,7 +14,7 @@ async function loadEvents() {
   try {
     categories.value = await getGroupedEvents(8);
   } catch (err) {
-    error.value = "Could not load events. Please check the backend API.";
+    error.value = "Could not load movies. Please check the backend API.";
   } finally {
     loading.value = false;
   }
@@ -27,10 +27,10 @@ onMounted(loadEvents);
   <div class="bg-brand-light dark:bg-slate-900 min-h-screen pb-20">
     <div class="bg-brand-navy py-16 px-4 text-center text-white mb-12 shadow-inner">
       <h1 class="text-4xl md:text-5xl text-brand-orange mb-4 uppercase tracking-tighter font-black">
-        Discover Events
+        Now Showing
       </h1>
       <p class="text-blue-100 max-w-2xl mx-auto text-lg">
-        Explore a wide range of categories and find the perfect event for you.
+        Browse movie genres, compare showtimes, and pick your next cinema night.
       </p>
     </div>
 
@@ -39,7 +39,7 @@ onMounted(loadEvents);
         v-if="loading"
         class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
       >
-        Loading events...
+        Loading movies...
       </div>
 
       <div
@@ -53,7 +53,7 @@ onMounted(loadEvents);
         v-else-if="categories.length === 0"
         class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
       >
-        No published events are available yet.
+        No published movies are available yet.
       </div>
 
       <template v-else>
@@ -64,7 +64,7 @@ onMounted(loadEvents);
                 {{ category.name }}
               </h2>
               <span class="bg-brand-orange/10 text-brand-orange text-sm font-bold px-3 py-1 rounded-full border border-brand-orange/20">
-                {{ category.events.length }} Events
+                {{ category.events.length }} Movies
               </span>
             </div>
             <p class="text-gray-500 dark:text-gray-400 italic">

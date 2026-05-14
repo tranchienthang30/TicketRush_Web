@@ -175,14 +175,14 @@ async function loadBookingData() {
     }
 
     if (!eventId) {
-      throw new Error("No event found");
+      throw new Error("No movie found");
     }
 
     bookingEvent.value = await getBookingEvent(eventId);
     startTimer();
   } catch {
     bookingEvent.value = null;
-    error.value = "Unable to load seat map. Please check event/backend data.";
+    error.value = "Unable to load seat map. Please check movie/backend data.";
   } finally {
     loading.value = false;
   }
@@ -203,7 +203,7 @@ onUnmounted(() => clearInterval(timerHandle));
               {{ bookingEvent?.title || "Choose Seats" }}
             </h1>
             <p class="mt-2 text-sm text-slate-500">
-              {{ eventDateLabel }} • {{ bookingEvent?.hallName || "Screen Room" }}
+              {{ eventDateLabel }} - {{ bookingEvent?.hallName || "Screen Room" }}
             </p>
           </div>
 
@@ -258,7 +258,7 @@ onUnmounted(() => clearInterval(timerHandle));
                   class="h-10 w-10 rounded-lg border-b-[3px] text-[11px] font-bold transition"
                   :class="seatClass(seat)"
                 >
-                  <span v-if="seat.status === 'SOLD'">★</span>
+                  <span v-if="seat.status === 'SOLD'">X</span>
                   <span v-else>{{ seat.seatCode }}</span>
                 </button>
                 <div class="w-6 text-center text-xs font-black text-slate-500">{{ row.rowLabel }}</div>
