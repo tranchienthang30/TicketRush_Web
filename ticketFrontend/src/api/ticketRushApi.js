@@ -17,6 +17,11 @@ export async function getEvents(params = {}) {
   return data;
 }
 
+export async function getBookingEvent(eventId) {
+  const { data } = await apiClient.get(`/events/${eventId}/booking`);
+  return data;
+}
+
 export async function getMembershipPlans() {
   const { data } = await apiClient.get("/membership/plans");
   return data;
@@ -44,6 +49,26 @@ export async function getProfile() {
 
 export async function getProfileDashboard() {
   const { data } = await apiClient.get("/me/dashboard");
+  return data;
+}
+
+export async function getMyTickets(params = {}) {
+  const { data } = await apiClient.get("/me/tickets", { params });
+  return data;
+}
+
+export async function getTicketDetail(orderId) {
+  const { data } = await apiClient.get(`/me/tickets/${orderId}`);
+  return data;
+}
+
+export async function previewCheckout(payload) {
+  const { data } = await apiClient.post("/me/checkout/preview", payload);
+  return data;
+}
+
+export async function confirmCheckout(payload) {
+  const { data } = await apiClient.post("/me/checkout/confirm", payload);
   return data;
 }
 
