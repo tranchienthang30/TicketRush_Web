@@ -64,6 +64,8 @@ public class AuthServiceImpl implements AuthService {
                 .provider(AuthProvider.LOCAL)
                 .status(UserStatus.ACTIVE)
                 .emailVerified(false)
+                .providerRequestStatus(Boolean.TRUE.equals(request.requestProviderAccess()) ? "PENDING" : null)
+                .providerRequestedAt(Boolean.TRUE.equals(request.requestProviderAccess()) ? Instant.now() : null)
                 .build();
 
         userRepository.save(user);

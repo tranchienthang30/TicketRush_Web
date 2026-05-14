@@ -1,14 +1,14 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
 
 defineProps(["isDark"]);
 const emit = defineEmits(["toggle-theme"]);
 
-const router = useRouter();
 const authStore = useAuthStore();
-
+const route = useRoute();
+const router = useRouter();
 const showProfileMenu = ref(false);
 
 const isLoggedIn = computed(() => authStore.isAuthenticated);
@@ -24,17 +24,43 @@ const initials = computed(() => {
     .join("")
     .toUpperCase();
 });
+const canManageMovies = computed(() => ["PROVIDER", "ADMIN"].includes(currentUser.value?.role));
 
-async function handleLogout() {
-  await authStore.logoutUser();
-  showProfileMenu.value = false;
-  router.push("/login");
-}
+const navItems = computed(() => [
+  { name: "Home", path: "/" },
+  { name: "Movies", path: "/events" },
+  canManageMovies.value
+    ? { name: "Managements", path: "/cinemas-management", auth: true, providerOnly: true }
+    : { name: "Booking", path: "/booking" },
+  { name: "Creating", path: "/create-movie", auth: true, providerOnly: true },
+  { name: "Help Center", path: "/help" },
+]);
+
+const visibleNavItems = computed(() =>
+  navItems.value.filter((item) => {
+    if (item.providerOnly) return canManageMovies.value;
+    if (item.auth) return isLoggedIn.value;
+    return true;
+  }),
+);
 
 function closeMenu(event) {
   if (!event.target.closest(".profile-dropdown-container")) {
     showProfileMenu.value = false;
   }
+}
+
+function isActiveNav(path) {
+  if (path === "/") {
+    return route.path === "/";
+  }
+  return route.path === path || route.path.startsWith(`${path}/`);
+}
+
+async function handleLogout() {
+  await authStore.logoutUser();
+  showProfileMenu.value = false;
+  router.push("/login");
 }
 
 onMounted(() => window.addEventListener("click", closeMenu));
@@ -54,32 +80,18 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
       <div class="hidden md:flex flex-1 mx-10">
         <input
           type="text"
-          placeholder="Events..."
+          placeholder="Movies..."
           class="w-full max-w-md px-5 py-2 rounded-full text-slate-900 focus:outline-none focus:ring-4 focus:ring-brand-orange/50 transition-all text-base"
         />
       </div>
 
       <div class="flex items-center gap-4 lg:gap-6">
         <router-link
+          v-if="isLoggedIn && !canManageMovies"
           to="/my-tickets"
-          class="hidden sm:flex items-center gap-2 hover:text-brand-orange transition text-base md:text-lg font-bold whitespace-nowrap group"
+          class="hidden sm:flex items-center gap-2 hover:text-brand-orange transition text-base md:text-lg font-bold whitespace-nowrap"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-110"
-          >
-            <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"></path>
-            <line x1="13" x2="13" y1="5" y2="19"></line>
-          </svg>
-          My tickets
+          My Tickets
         </router-link>
 
         <div class="profile-dropdown-container relative z-[100]">
@@ -97,7 +109,7 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
             :aria-expanded="showProfileMenu"
             aria-haspopup="menu"
             @click.stop="showProfileMenu = !showProfileMenu"
-            class="flex items-center gap-2 border-2 border-brand-orange rounded-full pl-2 pr-4 py-1.5 text-sm md:text-base font-bold hover:bg-brand-orange transition max-w-[210px]"
+            class="flex items-center gap-2 border-2 border-brand-orange rounded-full pl-2 pr-4 py-1.5 text-sm md:text-base font-bold hover:bg-brand-orange transition max-w-[220px]"
           >
             <span class="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-brand-orange text-white text-xs font-black">
               {{ initials }}
@@ -138,19 +150,30 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
             </router-link>
 
             <router-link
-              to="/my-events"
+              v-if="!canManageMovies"
+              to="/my-tickets"
               class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
               @click="showProfileMenu = false"
             >
-              My Events
+              My Tickets
             </router-link>
 
             <router-link
-              to="/create-event"
+              v-if="canManageMovies"
+              to="/create-movie"
               class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
               @click="showProfileMenu = false"
             >
-              Create Event
+              Creating
+            </router-link>
+
+            <router-link
+              v-if="canManageMovies"
+              to="/cinemas-management"
+              class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
+              @click="showProfileMenu = false"
+            >
+              Cinemas Management
             </router-link>
 
             <div class="border-t border-gray-100 dark:border-slate-700">
@@ -168,7 +191,7 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
         <button
           type="button"
           @click.stop="emit('toggle-theme')"
-          class="p-2.5 rounded-full hover:bg-white/10 transition text-xl"
+          class="p-2.5 rounded-full hover:bg-white/10 transition text-sm font-bold uppercase tracking-[0.2em]"
           aria-label="Toggle theme"
         >
           {{ isDark ? "Dark" : "Light" }}
@@ -177,21 +200,23 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
     </div>
 
     <div class="relative z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 md:px-8 py-3 overflow-x-auto shadow-sm">
-      <nav class="flex justify-center gap-12 lg:gap-16 items-center whitespace-nowrap">
+      <nav class="flex justify-center gap-10 lg:gap-14 items-center whitespace-nowrap">
         <router-link
-          v-for="item in [
-            { name: 'Events', path: '/events' },
-            { name: 'Create Events', path: '/create-event' },
-            { name: 'My Events', path: '/my-events' },
-            { name: 'Membership', path: '/membership' },
-            { name: 'Help Center', path: '/help' }
-          ]"
+          v-for="item in visibleNavItems"
           :key="item.name"
           :to="item.path"
-          class="relative py-2 text-base md:text-lg font-extrabold text-slate-600 dark:text-slate-300 hover:text-brand-navy dark:hover:text-brand-orange transition-all duration-300 group tracking-wide"
+          class="relative py-2 text-base md:text-lg font-extrabold transition-all duration-300 group tracking-wide"
+          :class="
+            isActiveNav(item.path)
+              ? 'text-brand-navy dark:text-brand-orange'
+              : 'text-slate-600 dark:text-slate-300 hover:text-brand-navy dark:hover:text-brand-orange'
+          "
         >
           {{ item.name }}
-          <span class="absolute bottom-0 left-0 w-0 h-[3px] bg-brand-orange transition-all duration-300 group-hover:w-full"></span>
+          <span
+            class="absolute bottom-0 left-0 h-[3px] bg-brand-orange transition-all duration-300"
+            :class="isActiveNav(item.path) ? 'w-full' : 'w-0 group-hover:w-full'"
+          ></span>
         </router-link>
       </nav>
     </div>

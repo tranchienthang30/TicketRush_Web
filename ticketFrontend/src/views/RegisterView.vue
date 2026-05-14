@@ -12,6 +12,7 @@ const form = reactive({
   email: "",
   phone: "",
   password: "",
+  requestProviderAccess: false,
 });
 
 const error = ref("");
@@ -29,12 +30,18 @@ async function handleRegister() {
     return;
   }
 
+  if (form.phone && !/^\+?\d{8,15}$/.test(form.phone)) {
+    error.value = "Phone must contain only digits and may start with +.";
+    return;
+  }
+
   try {
     await authStore.registerUser({
       fullName: form.fullName,
       email: form.email,
       phone: form.phone || null,
       password: form.password,
+      requestProviderAccess: form.requestProviderAccess,
       recaptchaToken: await getRecaptchaToken("register"),
     });
 
@@ -53,7 +60,7 @@ async function handleRegister() {
           Create account
         </h1>
         <p class="text-gray-500 dark:text-gray-400 mt-2">
-          Create an account to book tickets and host events.
+          Create an account to book movie seats and save your tickets.
         </p>
       </div>
 
@@ -109,6 +116,17 @@ async function handleRegister() {
             class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30"
           />
         </div>
+
+        <label class="flex gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4 text-sm text-slate-600 dark:text-slate-300">
+          <input
+            v-model="form.requestProviderAccess"
+            type="checkbox"
+            class="mt-1 h-4 w-4 rounded border-slate-300 text-brand-orange focus:ring-brand-orange"
+          />
+          <span>
+            I want to register as a movie provider. TicketRush will record this request for admin review.
+          </span>
+        </label>
 
         <p v-if="error" class="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
           {{ error }}

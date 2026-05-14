@@ -2,7 +2,15 @@ package com.example.ticket.service;
 
 import com.example.ticket.dto.request.CreateEventRequest;
 import com.example.ticket.dto.request.EventSectionRequest;
+import com.example.ticket.dto.BookingEventResponse;
+import com.example.ticket.dto.BookingSectionResponse;
+import com.example.ticket.dto.BookingSeatResponse;
+import com.example.ticket.dto.CategoryEventsResponse;
+import com.example.ticket.dto.CategoryResponse;
+import com.example.ticket.dto.EventCardResponse;
+import com.example.ticket.dto.EventPageResponse;
 import com.example.ticket.dto.response.EventResponse;
+import com.example.ticket.exception.ApiException;
 import com.example.ticket.exception.AppException;
 import com.example.ticket.model.entity.Event;
 import com.example.ticket.model.entity.EventSeat;
@@ -12,18 +20,26 @@ import com.example.ticket.model.enums.EventStatus;
 import com.example.ticket.model.enums.SeatStatus;
 import com.example.ticket.model.enums.UserRole;
 import com.example.ticket.repository.CategoryRepository;
+import com.example.ticket.repository.EventQueryRepository;
 import com.example.ticket.repository.EventRepository;
 import com.example.ticket.repository.EventSeatRepository;
 import com.example.ticket.repository.EventSectionRepository;
 import com.example.ticket.repository.UserRepository;
 import com.example.ticket.security.JwtPrincipal;
+import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.text.Normalizer;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -35,8 +51,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class EventServiceImpl implements EventService {
     private static final Pattern NON_LATIN = Pattern.compile("[^\\w-]");
     private static final Pattern WHITESPACE = Pattern.compile("[\\s]+");
+    private static final ZoneId APP_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("MMM dd, yyyy", Locale.ENGLISH);
+    private static final Locale VIETNAM = Locale.forLanguageTag("vi-VN");
 
     private final EventRepository eventRepository;
+    private final EventQueryRepository eventQueryRepository;
     private final EventSectionRepository sectionRepository;
     private final EventSeatRepository seatRepository;
     private final CategoryRepository categoryRepository;
@@ -44,12 +64,14 @@ public class EventServiceImpl implements EventService {
 
     public EventServiceImpl(
             EventRepository eventRepository,
+            EventQueryRepository eventQueryRepository,
             EventSectionRepository sectionRepository,
             EventSeatRepository seatRepository,
             CategoryRepository categoryRepository,
             UserRepository userRepository
     ) {
         this.eventRepository = eventRepository;
+        this.eventQueryRepository = eventQueryRepository;
         this.sectionRepository = sectionRepository;
         this.seatRepository = seatRepository;
         this.categoryRepository = categoryRepository;
@@ -59,11 +81,11 @@ public class EventServiceImpl implements EventService {
     @Override
     public EventResponse createEvent(CreateEventRequest request) {
         User user = currentUser();
-        if (user.getRole() != UserRole.ORGANIZER && user.getRole() != UserRole.ADMIN) {
-            throw new AppException(HttpStatus.FORBIDDEN, "You need a verified organization before creating events");
+        if (user.getRole() != UserRole.PROVIDER && user.getRole() != UserRole.ADMIN) {
+            throw new AppException(HttpStatus.FORBIDDEN, "You need provider access before creating movies");
         }
         if (user.getPrimaryOrganizationId() == null && user.getRole() != UserRole.ADMIN) {
-            throw new AppException(HttpStatus.FORBIDDEN, "You need a verified organization before creating events");
+            throw new AppException(HttpStatus.FORBIDDEN, "You need a verified business profile before creating movies");
         }
         if (!categoryRepository.existsById(request.categoryId())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Category does not exist");
@@ -78,7 +100,7 @@ public class EventServiceImpl implements EventService {
         }
 
         Event event = Event.builder()
-                .organizerId(user.getId())
+                .providerId(user.getId())
                 .organizationId(user.getPrimaryOrganizationId())
                 .categoryId(request.categoryId())
                 .title(request.title().trim())
@@ -98,7 +120,7 @@ public class EventServiceImpl implements EventService {
                 .payoutBankName(blankToNull(request.payoutBankName()))
                 .payoutAccountName(blankToNull(request.payoutAccountName()))
                 .payoutAccountNumber(blankToNull(request.payoutAccountNumber()))
-                .organizerTermsAcceptedAt(Instant.now())
+                .providerTermsAcceptedAt(Instant.now())
                 .build();
 
         eventRepository.save(event);
@@ -127,7 +149,7 @@ public class EventServiceImpl implements EventService {
     @Transactional(readOnly = true)
     public List<EventResponse> myEvents() {
         UUID userId = currentUserId();
-        return eventRepository.findByOrganizerIdOrderByCreatedAtDesc(userId)
+        return eventRepository.findByProviderIdOrderByCreatedAtDesc(userId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -138,6 +160,100 @@ public class EventServiceImpl implements EventService {
     public EventResponse eventBySlug(String slug) {
         return toResponse(eventRepository.findBySlug(slug)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Event does not exist")));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CategoryResponse> getCategories() {
+        return eventQueryRepository.findActiveCategories();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CategoryEventsResponse> getGroupedEvents(int limitPerCategory) {
+        int safeLimit = clamp(limitPerCategory, 1, 12);
+
+        return eventQueryRepository.findActiveCategories().stream()
+                .map(category -> new CategoryEventsResponse(
+                        category.id(),
+                        category.name(),
+                        category.slug(),
+                        category.description(),
+                        category.imageUrl(),
+                        toEventCards(eventQueryRepository.findPublishedEventsByCategory(category.id(), safeLimit))
+                ))
+                .filter(category -> !category.events().isEmpty())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EventPageResponse searchEvents(Long categoryId, String query, String city, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = clamp(size, 1, 50);
+        long total = eventQueryRepository.countPublishedEvents(categoryId, query, city);
+        int totalPages = total == 0 ? 0 : (int) Math.ceil((double) total / safeSize);
+
+        List<EventCardResponse> content = toEventCards(
+                eventQueryRepository.findPublishedEvents(categoryId, query, city, safePage, safeSize)
+        );
+
+        return new EventPageResponse(content, safePage, safeSize, total, totalPages);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BookingEventResponse getBookingEvent(UUID eventId) {
+        EventQueryRepository.BookingEventRow event = eventQueryRepository.findPublishedEventForBooking(eventId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Movie not found"));
+
+        List<EventQueryRepository.BookingSectionRow> sections = eventQueryRepository.findSectionsByEvent(eventId);
+        Map<UUID, List<BookingSeatResponse>> seatsBySection = eventQueryRepository.findSeatsByEvent(eventId).stream()
+                .collect(Collectors.groupingBy(
+                        EventQueryRepository.BookingSeatRow::sectionId,
+                        Collectors.mapping(row -> new BookingSeatResponse(
+                                row.id(),
+                                row.sectionId(),
+                                row.rowLabel(),
+                                row.seatNumber(),
+                                row.seatCode(),
+                                row.price(),
+                                row.status(),
+                                row.seatTypeCode(),
+                                row.layoutX(),
+                                row.layoutY(),
+                                row.hidden(),
+                                row.accessible()
+                        ), Collectors.toList())
+                ));
+
+        List<BookingSectionResponse> sectionResponses = sections.stream()
+                .map(section -> new BookingSectionResponse(
+                        section.id(),
+                        section.name(),
+                        section.basePrice(),
+                        section.rowCount(),
+                        section.seatsPerRow(),
+                        section.displayOrder(),
+                        seatsBySection.getOrDefault(section.id(), List.of())
+                ))
+                .toList();
+
+        return new BookingEventResponse(
+                event.id(),
+                event.slug(),
+                event.title(),
+                event.bannerUrl(),
+                event.location(),
+                event.hallName(),
+                event.status(),
+                event.startTime(),
+                event.saleStartTime(),
+                event.saleEndTime(),
+                event.availableSeats(),
+                event.soldSeats(),
+                sectionResponses
+        );
     }
 
     private List<EventSection> createSections(Event event, List<EventSectionRequest> sectionRequests) {
@@ -186,6 +302,60 @@ public class EventServiceImpl implements EventService {
             totalSeats = sections.stream().mapToLong(section -> section.getRowCount() * section.getSeatsPerRow()).sum();
         }
         return EventResponse.from(event, sections, totalSeats);
+    }
+
+    private List<EventCardResponse> toEventCards(List<EventQueryRepository.EventRow> rows) {
+        return rows.stream().map(this::toEventCard).toList();
+    }
+
+    private EventCardResponse toEventCard(EventQueryRepository.EventRow row) {
+        return new EventCardResponse(
+                row.id(),
+                row.slug(),
+                row.title(),
+                formatDate(row.startTime()),
+                row.location(),
+                formatPrice(row.minPrice()),
+                resolveTag(row),
+                row.bannerUrl()
+        );
+    }
+
+    private String formatDate(OffsetDateTime dateTime) {
+        if (dateTime == null) {
+            return "";
+        }
+        return dateTime.atZoneSameInstant(APP_ZONE).format(DATE_FORMATTER);
+    }
+
+    private String formatPrice(BigDecimal price) {
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            return "Free";
+        }
+        return "from " + NumberFormat.getNumberInstance(VIETNAM).format(price) + " VND";
+    }
+
+    private String resolveTag(EventQueryRepository.EventRow row) {
+        OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
+        long knownSeats = row.availableSeats() + row.soldSeats();
+
+        if (row.saleStartTime() != null && row.saleStartTime().isAfter(now)) {
+            return "Coming Soon";
+        }
+        if (knownSeats > 0 && row.availableSeats() == 0) {
+            return "Sold Out";
+        }
+        if (row.availableSeats() > 0 && row.availableSeats() <= 5) {
+            return "Selling Fast";
+        }
+        if (row.soldSeats() > 0) {
+            return "Hot";
+        }
+        return "New";
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private User currentUser() {
