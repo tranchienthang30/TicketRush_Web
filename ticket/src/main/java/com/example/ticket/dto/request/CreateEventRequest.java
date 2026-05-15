@@ -2,6 +2,7 @@ package com.example.ticket.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -17,6 +18,11 @@ public record CreateEventRequest(
 
         @NotNull(message = "Category is required")
         Long categoryId,
+
+        @Min(value = 1, message = "Movie duration must be at least 1 minute")
+        Integer durationMinutes,
+
+        String listingType,
 
         @NotBlank(message = "Venue is required")
         String locationName,

@@ -24,6 +24,19 @@ function formatDate(value) {
     ? new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value))
     : "TBA";
 }
+
+function formatDuration(minutes) {
+  if (!minutes) return "TBA";
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours > 0 && remainingMinutes > 0) return `${hours}h ${remainingMinutes}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${remainingMinutes}m`;
+}
+
+function formatListingType(type) {
+  return String(type || "NOW_SHOWING").replaceAll("_", " ");
+}
 </script>
 
 <template>
@@ -49,6 +62,7 @@ function formatDate(value) {
             <span class="text-xs font-black bg-brand-orange/10 text-brand-orange px-2 py-1 rounded">{{ event.status }}</span>
           </div>
           <p class="text-gray-500 dark:text-slate-400">Start: {{ formatDate(event.startTime) }}</p>
+          <p class="text-gray-500 dark:text-slate-400">Duration: {{ formatDuration(event.durationMinutes) }} | Section: {{ formatListingType(event.listingType) }}</p>
           <p class="text-gray-500 dark:text-slate-400">Seats: {{ event.totalSeats }} | Provider: {{ event.seatProvider }}</p>
         </div>
         <div class="flex gap-2">

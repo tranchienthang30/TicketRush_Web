@@ -33,6 +33,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -107,6 +108,8 @@ public class EventServiceImpl implements EventService {
                 .slug(uniqueSlug(request.title()))
                 .description(blankToNull(request.description()))
                 .bannerUrl(blankToNull(request.bannerUrl()))
+                .durationMinutes(resolveDurationMinutes(request))
+                .listingType(normalizeListingType(request.listingType()))
                 .locationName(request.locationName().trim())
                 .city(request.city().trim())
                 .address(blankToNull(request.address()))
@@ -317,7 +320,11 @@ public class EventServiceImpl implements EventService {
                 row.location(),
                 formatPrice(row.minPrice()),
                 resolveTag(row),
-                row.bannerUrl()
+                row.bannerUrl(),
+                row.categoryName(),
+                row.durationMinutes(),
+                row.listingType(),
+                isBookingAvailable(row)
         );
     }
 
@@ -338,12 +345,19 @@ public class EventServiceImpl implements EventService {
     private String resolveTag(EventQueryRepository.EventRow row) {
         OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
         long knownSeats = row.availableSeats() + row.soldSeats();
+        String listingType = normalizeListingType(row.listingType());
 
         if (row.saleStartTime() != null && row.saleStartTime().isAfter(now)) {
             return "Coming Soon";
         }
         if (knownSeats > 0 && row.availableSeats() == 0) {
             return "Sold Out";
+        }
+        if ("UPCOMING".equals(listingType)) {
+            return "Coming Soon";
+        }
+        if ("SPECIAL".equals(listingType)) {
+            return "Special";
         }
         if (row.availableSeats() > 0 && row.availableSeats() <= 5) {
             return "Selling Fast";
@@ -352,6 +366,22 @@ public class EventServiceImpl implements EventService {
             return "Hot";
         }
         return "New";
+    }
+
+    private boolean isBookingAvailable(EventQueryRepository.EventRow row) {
+        OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
+        String listingType = normalizeListingType(row.listingType());
+
+        if ("UPCOMING".equals(listingType)) {
+            return false;
+        }
+        if (row.saleStartTime() != null && row.saleStartTime().isAfter(now)) {
+            return false;
+        }
+        if (row.saleEndTime() != null && row.saleEndTime().isBefore(now)) {
+            return false;
+        }
+        return row.availableSeats() > 0;
     }
 
     private int clamp(int value, int min, int max) {
@@ -396,6 +426,24 @@ public class EventServiceImpl implements EventService {
             value = value / 26 - 1;
         } while (value >= 0);
         return label.toString();
+    }
+
+    private int resolveDurationMinutes(CreateEventRequest request) {
+        if (request.durationMinutes() != null) {
+            return request.durationMinutes();
+        }
+        return Math.max(1, (int) ChronoUnit.MINUTES.between(request.startTime(), request.endTime()));
+    }
+
+    private String normalizeListingType(String listingType) {
+        if (listingType == null || listingType.isBlank()) {
+            return "NOW_SHOWING";
+        }
+        String normalized = listingType.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        return switch (normalized) {
+            case "NOW_SHOWING", "UPCOMING", "SPECIAL" -> normalized;
+            default -> throw new AppException(HttpStatus.BAD_REQUEST, "Movie listing type is invalid");
+        };
     }
 
     private String normalizeSeatProvider(String seatProvider) {

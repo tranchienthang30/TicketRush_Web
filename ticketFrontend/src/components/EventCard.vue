@@ -24,43 +24,90 @@ const imageSrc = computed(() => {
   const index = [...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0) % fallbackImages.length;
   return fallbackImages[index];
 });
+
+const durationText = computed(() => {
+  const duration =
+    props.event.durationMinutes ?? props.event.duration ?? props.event.runtime ?? props.event.length;
+
+  if (!duration) return "TBA";
+
+  const minutes = Number(duration);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return String(duration);
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours > 0 && remainingMinutes > 0) {
+    return `${hours}h ${remainingMinutes}m`;
+  }
+  if (hours > 0) {
+    return `${hours}h`;
+  }
+  return `${remainingMinutes}m`;
+});
+
+const canBook = computed(() => {
+  if (typeof props.event.bookable === "boolean") {
+    return props.event.bookable;
+  }
+
+  const listingType = String(props.event.listingType || "").toUpperCase();
+  return listingType !== "UPCOMING" && props.event.tag !== "Coming Soon" && props.event.tag !== "Sold Out";
+});
 </script>
 
 <template>
-  <div class="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-lg hover:-translate-y-2 transition-transform duration-300 group cursor-pointer flex flex-col border border-gray-100 dark:border-slate-700">
-    <div class="relative h-48 overflow-hidden bg-slate-200 flex items-center justify-center text-gray-400">
+  <div class="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-md hover:-translate-y-2 transition-transform duration-300 group cursor-pointer border border-gray-100 dark:border-slate-700">
+    <div class="relative h-64 overflow-hidden bg-slate-200 flex items-center justify-center text-gray-400">
       <img
         :src="imageSrc"
-        class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+        class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         alt="Movie poster"
       />
 
+      <!-- left tag (e.g., HOT, P) -->
       <div
         v-if="event.tag"
-        class="absolute top-3 left-3 bg-brand-orange text-white text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm uppercase tracking-wider"
+        class="absolute top-3 left-3 bg-brand-orange text-white text-xs font-black px-3 py-1.5 rounded-lg shadow-sm uppercase tracking-wider"
       >
         {{ event.tag }}
       </div>
+
+      <!-- age / rating badge -->
+      <div v-if="event.rating" class="absolute top-3 right-3 bg-white/90 text-brand-navy text-xs font-bold px-2 py-1 rounded-md shadow-sm">
+        {{ event.rating }}
+      </div>
     </div>
 
-    <div class="p-5 flex flex-col flex-grow">
-      <h4 class="font-bold text-lg mb-2 dark:text-white group-hover:text-brand-orange transition line-clamp-2">
+    <div class="p-4 md:p-5">
+      <h4 class="font-bold text-lg mb-1 dark:text-white group-hover:text-brand-orange transition line-clamp-2">
         {{ event.title }}
       </h4>
 
-      <div class="text-sm text-gray-500 dark:text-slate-400 mb-4 space-y-1">
-        <p>Showtime: {{ event.date }}</p>
-        <p>Cinema: {{ event.location }}</p>
+      <div class="text-sm text-gray-500 dark:text-slate-400 mb-3 flex items-center gap-3">
+        <span class="inline-block">Genre: {{ event.category || 'Movie' }}</span>
+        <span class="inline-block">/</span>
+        <span class="inline-block">Duration: {{ durationText }}</span>
       </div>
 
-      <div class="mt-auto flex justify-between items-center pt-4 border-t border-gray-50 dark:border-slate-700">
-        <span class="text-brand-orange font-black text-xl">{{ event.price }}</span>
+      <div class="flex items-center justify-between">
+        <div class="text-brand-orange font-black text-lg">{{ event.price || '' }}</div>
+
         <router-link
+          v-if="canBook"
           :to="`/booking?eventId=${event.id}`"
           class="bg-brand-navy text-white px-4 py-2 rounded-lg hover:bg-brand-orange transition-all font-bold shadow-md active:scale-95"
         >
-          Book Seats
+          BUY TICKET
         </router-link>
+        <span
+          v-else
+          class="bg-slate-200 text-slate-500 px-4 py-2 rounded-lg font-bold cursor-not-allowed dark:bg-slate-700 dark:text-slate-300"
+        >
+          COMING SOON
+        </span>
       </div>
     </div>
   </div>

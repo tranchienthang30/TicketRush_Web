@@ -24,6 +24,8 @@ const form = reactive({
   description: "",
   bannerUrl: "",
   categoryId: "",
+  durationMinutes: 120,
+  listingType: "NOW_SHOWING",
   locationName: "",
   city: "",
   address: "",
@@ -125,7 +127,15 @@ async function submitEvent() {
 }
 
 function isStepOneValid() {
-  return Boolean(form.title && form.categoryId && form.locationName && form.city && form.startTime && form.endTime);
+  return Boolean(
+    form.title &&
+      form.categoryId &&
+      form.durationMinutes > 0 &&
+      form.locationName &&
+      form.city &&
+      form.startTime &&
+      form.endTime,
+  );
 }
 
 function isStepTwoValid() {
@@ -143,6 +153,8 @@ function toPayload() {
     description: form.description || null,
     bannerUrl: form.bannerUrl || null,
     categoryId: Number(form.categoryId),
+    durationMinutes: Number(form.durationMinutes),
+    listingType: form.listingType,
     locationName: form.locationName,
     city: form.city,
     address: form.address || null,
@@ -248,6 +260,18 @@ function toInstant(value) {
                 <select v-model="form.categoryId" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                   <option value="">Select category</option>
                   <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Duration (minutes)</span>
+                <input v-model.number="form.durationMinutes" type="number" min="1" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+              </label>
+              <label class="block">
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Movie section</span>
+                <select v-model="form.listingType" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                  <option value="NOW_SHOWING">Now Showing</option>
+                  <option value="UPCOMING">Upcoming</option>
+                  <option value="SPECIAL">Special</option>
                 </select>
               </label>
               <label class="block">
