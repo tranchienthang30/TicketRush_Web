@@ -1,9 +1,11 @@
 <script setup>
 import { reactive, ref } from "vue";
-import { useRouter, RouterLink } from "vue-router";
-import { useAuthStore } from "../stores/authStore.js";
-import { loginWithGoogle } from "../api/auth.api";
+import { useRoute, useRouter, RouterLink } from "vue-router";
+import { useAuthStore } from "@/stores/authStore";
+import { loginWithGoogle } from "@/api/auth.api";
+import { getRecaptchaToken } from "@/utils/recaptcha";
 
+const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
@@ -12,13 +14,13 @@ const form = reactive({
   password: "",
 });
 
-const error = ref("");
+const error = ref(route.query.oauthError?.toString() || "");
 
 async function handleLogin() {
   error.value = "";
 
   if (!form.email || !form.password) {
-    error.value = "Please enter your email and password";
+    error.value = "Please enter your email and password.";
     return;
   }
 
@@ -26,22 +28,19 @@ async function handleLogin() {
     await authStore.loginUser({
       email: form.email,
       password: form.password,
+      recaptchaToken: await getRecaptchaToken("login"),
     });
 
-    router.push("/");
-  } catch (err) {
-    error.value = authStore.error || "Login failed";
+    router.push(route.query.redirect?.toString() || "/");
+  } catch {
+    error.value = authStore.error || "Login failed. Please try again.";
   }
-}
-
-function handleGoogleLogin() {
-  loginWithGoogle();
 }
 </script>
 
 <template>
   <div class="min-h-screen bg-brand-light dark:bg-slate-900 flex items-center justify-center px-4 py-14">
-    <div class="w-full max-w-md bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-gray-100 dark:border-slate-700 p-8">
+    <div class="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 p-8">
       <div class="text-center mb-8">
         <h1 class="text-3xl font-black text-brand-navy dark:text-white">
           Welcome back
@@ -57,21 +56,28 @@ function handleGoogleLogin() {
             Email
           </label>
           <input
-            v-model="form.email"
+            v-model.trim="form.email"
             type="email"
+            autocomplete="email"
             placeholder="you@example.com"
             class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">
-            Password
-          </label>
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <label class="block text-sm font-bold text-slate-700 dark:text-slate-200">
+              Password
+            </label>
+            <RouterLink to="/forgot-password" class="text-sm font-bold text-brand-orange hover:underline">
+              Forgot password?
+            </RouterLink>
+          </div>
           <input
             v-model="form.password"
             type="password"
-            placeholder="********"
+            autocomplete="current-password"
+            placeholder="At least 8 characters"
             class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30"
           />
         </div>
@@ -97,7 +103,7 @@ function handleGoogleLogin() {
 
       <button
         type="button"
-        @click="handleGoogleLogin"
+        @click="loginWithGoogle"
         class="w-full border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-slate-800 dark:text-white font-bold py-3 rounded-xl transition"
       >
         Continue with Google

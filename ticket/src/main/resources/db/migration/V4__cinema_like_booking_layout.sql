@@ -1,6 +1,17 @@
 -- V4__cinema_like_booking_layout.sql
 -- Refine demo booking layout to resemble a real cinema map (rows A-K, VIP block, couple row).
 
+ALTER TABLE events
+ADD COLUMN IF NOT EXISTS seat_provider VARCHAR(30) NOT NULL DEFAULT 'INTERNAL',
+ADD COLUMN IF NOT EXISTS external_seat_chart_key VARCHAR(255),
+ADD COLUMN IF NOT EXISTS payout_bank_name VARCHAR(120),
+ADD COLUMN IF NOT EXISTS payout_account_name VARCHAR(120),
+ADD COLUMN IF NOT EXISTS payout_account_number VARCHAR(60),
+ADD COLUMN IF NOT EXISTS provider_terms_accepted_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_events_seat_provider ON events(seat_provider);
+CREATE INDEX IF NOT EXISTS idx_events_external_seat_chart_key ON events(external_seat_chart_key);
+
 -- =========================================================
 -- TARGET EVENT / HALL DISPLAY
 -- =========================================================
