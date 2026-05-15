@@ -156,30 +156,18 @@ public class CheckoutQueryRepository {
             BigDecimal totalAmount,
             UUID voucherId,
             OffsetDateTime expiresAt,
-<<<<<<< HEAD
-            OffsetDateTime paidAt
-=======
             String status,
             OffsetDateTime paidAt,
             Long payosOrderCode
->>>>>>> f3c1cd8cfac6f82f993fe8c727f8f8cdde7f8dbc
     ) {
         String sql = """
                 INSERT INTO orders (
                     id, user_id, event_id, status, subtotal, discount_amount, total_amount,
-<<<<<<< HEAD
-                    voucher_id, expires_at, created_at, paid_at, cancelled_at
-                )
-                VALUES (
-                    :id, :userId, :eventId, 'PAID', :subtotal, :discountAmount, :totalAmount,
-                    :voucherId, :expiresAt, now(), :paidAt, NULL
-=======
                     voucher_id, expires_at, created_at, paid_at, cancelled_at, payos_order_code
                 )
                 VALUES (
                     :id, :userId, :eventId, CAST(:status AS order_status), :subtotal, :discountAmount, :totalAmount,
                     :voucherId, :expiresAt, now(), :paidAt, NULL, :payosOrderCode
->>>>>>> f3c1cd8cfac6f82f993fe8c727f8f8cdde7f8dbc
                 )
                 """;
 
@@ -192,18 +180,6 @@ public class CheckoutQueryRepository {
                 .addValue("totalAmount", totalAmount)
                 .addValue("voucherId", voucherId)
                 .addValue("expiresAt", expiresAt)
-<<<<<<< HEAD
-                .addValue("paidAt", paidAt));
-    }
-
-    public void insertOrderItem(
-            UUID id,
-            UUID orderId,
-            UUID eventSeatId,
-            BigDecimal priceSnapshot,
-            String qrCode,
-            OffsetDateTime issuedAt
-=======
                 .addValue("status", status)
                 .addValue("paidAt", paidAt)
                 .addValue("payosOrderCode", payosOrderCode));
@@ -214,7 +190,6 @@ public class CheckoutQueryRepository {
             UUID orderId,
             UUID eventSeatId,
             BigDecimal priceSnapshot
->>>>>>> f3c1cd8cfac6f82f993fe8c727f8f8cdde7f8dbc
     ) {
         String sql = """
                 INSERT INTO order_items (
@@ -222,13 +197,8 @@ public class CheckoutQueryRepository {
                     ticket_status, issued_at, checked_in_at
                 )
                 VALUES (
-<<<<<<< HEAD
-                    :id, :orderId, :eventSeatId, :priceSnapshot, :qrCode,
-                    'VALID', :issuedAt, NULL
-=======
                     :id, :orderId, :eventSeatId, :priceSnapshot, NULL,
                     'NOT_ISSUED', NULL, NULL
->>>>>>> f3c1cd8cfac6f82f993fe8c727f8f8cdde7f8dbc
                 )
                 """;
 
@@ -236,13 +206,6 @@ public class CheckoutQueryRepository {
                 .addValue("id", id)
                 .addValue("orderId", orderId)
                 .addValue("eventSeatId", eventSeatId)
-<<<<<<< HEAD
-                .addValue("priceSnapshot", priceSnapshot)
-                .addValue("qrCode", qrCode)
-                .addValue("issuedAt", issuedAt));
-    }
-
-=======
                 .addValue("priceSnapshot", priceSnapshot));
     }
 
@@ -386,7 +349,6 @@ public class CheckoutQueryRepository {
                 ));
     }
 
->>>>>>> f3c1cd8cfac6f82f993fe8c727f8f8cdde7f8dbc
     public int incrementVoucherUsage(UUID voucherId) {
         String sql = """
                 UPDATE vouchers
@@ -517,8 +479,6 @@ public class CheckoutQueryRepository {
             OffsetDateTime issuedAt
     ) {
     }
-<<<<<<< HEAD
-=======
 
     public record OrderStatusRow(
             UUID orderId,
@@ -541,5 +501,4 @@ public class CheckoutQueryRepository {
             String qrCode
     ) {
     }
->>>>>>> f3c1cd8cfac6f82f993fe8c727f8f8cdde7f8dbc
 }
