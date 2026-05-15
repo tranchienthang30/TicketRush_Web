@@ -9,7 +9,7 @@ export function login(payload) {
 }
 
 export function getCurrentUser() {
-  return apiClient.get("/api/users/me", { skipAuthRedirect: true });
+  return apiClient.get("/api/auth/me", { skipAuthRedirect: true });
 }
 
 export function logout() {

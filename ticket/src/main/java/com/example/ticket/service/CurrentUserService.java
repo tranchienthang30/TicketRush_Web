@@ -1,14 +1,24 @@
 package com.example.ticket.service;
 
+import com.example.ticket.exception.ApiException;
+import com.example.ticket.security.JwtPrincipal;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
 @Service
 public class CurrentUserService {
-    private static final UUID DEMO_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
-
     public UUID resolve(UUID headerUserId) {
-        return headerUserId == null ? DEMO_USER_ID : headerUserId;
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof JwtPrincipal principal) {
+            return principal.userId();
+        }
+        if (headerUserId != null) {
+            return headerUserId;
+        }
+        throw new ApiException(HttpStatus.UNAUTHORIZED, "You need to sign in");
     }
 }

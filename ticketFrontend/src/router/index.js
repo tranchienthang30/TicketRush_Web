@@ -9,6 +9,8 @@ const router = createRouter({
     { path: "/help", name: "help", component: () => import("@/views/HelpCenterView.vue") },
     { path: "/booking", name: "booking", component: () => import("@/views/BookView.vue"), meta: { requiresAuth: true } },
     { path: "/checkout", name: "checkout", component: () => import("@/views/CheckoutView.vue"), meta: { requiresAuth: true } },
+    { path: "/checkout/success", name: "checkout-success", component: () => import("@/views/CheckoutSuccessView.vue") },
+    { path: "/checkout/cancel", name: "checkout-cancel", component: () => import("@/views/CheckoutCancelView.vue") },
     { path: "/my-tickets", name: "my-tickets", component: () => import("@/views/MyTicketsView.vue"), meta: { requiresAuth: true } },
     { path: "/profile", name: "profile", component: () => import("@/views/ProfileView.vue"), meta: { requiresAuth: true } },
     { path: "/account", redirect: "/profile" },

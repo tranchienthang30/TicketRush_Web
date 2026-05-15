@@ -45,13 +45,54 @@ const rowGroups = computed(() => {
 
   return Object.entries(grouped)
     .sort(([rowA], [rowB]) => rowA.localeCompare(rowB))
-    .map(([rowLabel, seats]) => ({
-      rowLabel,
-      seats: seats.sort((a, b) => a.layoutX - b.layoutX),
-    }));
+    .map(([rowLabel, seats]) => {
+      const sortedSeats = seats.sort((a, b) => a.layoutX - b.layoutX);
+      const units = [];
+
+      for (let index = 0; index < sortedSeats.length; index += 1) {
+        const current = sortedSeats[index];
+        const next = sortedSeats[index + 1];
+
+        if (isCoupleSeat(current) && next && isCoupleSeat(next) && next.seatNumber === current.seatNumber + 1) {
+          units.push({
+            key: `${current.id}-${next.id}`,
+            seats: [current, next],
+            label: `${current.rowLabel}${current.seatNumber}-${current.rowLabel}${next.seatNumber}`,
+            type: "pair",
+          });
+          index += 1;
+          continue;
+        }
+
+        units.push({
+          key: current.id,
+          seats: [current],
+          label: current.seatCode,
+          type: "single",
+        });
+      }
+
+      const totalSpan = units.reduce((sum, unit) => sum + (unit.type === "pair" ? 2 : 1), 0);
+      const offset = Math.max(0, Math.floor((14 - totalSpan) / 2));
+
+      return { rowLabel, units, offset };
+    });
 });
 
-const selectedSeatCodes = computed(() => selectedSeats.value.map((seat) => seat.seatCode));
+const selectedSeatCodes = computed(() => {
+  const selectedIds = new Set(selectedSeats.value.map((seat) => seat.id));
+  const codes = [];
+
+  for (const row of rowGroups.value) {
+    for (const unit of row.units) {
+      if (unit.seats.every((seat) => selectedIds.has(seat.id))) {
+        codes.push(unit.label);
+      }
+    }
+  }
+
+  return codes;
+});
 const totalPrice = computed(() => selectedSeats.value.reduce((sum, seat) => sum + Number(seat.price || 0), 0));
 
 const showtimeLabel = computed(() => {
@@ -95,43 +136,65 @@ function isSeatSelected(seatId) {
   return selectedSeats.value.some((seat) => seat.id === seatId);
 }
 
-function canSelectSeat(seat) {
-  return seat.status === "AVAILABLE";
+function isCoupleSeat(seat) {
+  return seat.seatTypeCode === "COUPLE" || seat.seatTypeCode === "SWEETBOX";
 }
 
-function toggleSeat(seat) {
-  if (!canSelectSeat(seat)) return;
+function canSelectSeatUnit(unit) {
+  return unit.seats.every((seat) => seat.status === "AVAILABLE");
+}
 
-  const index = selectedSeats.value.findIndex((selected) => selected.id === seat.id);
-  if (index >= 0) {
-    selectedSeats.value.splice(index, 1);
-  } else {
-    selectedSeats.value.push(seat);
+function isUnitSelected(unit) {
+  return unit.seats.every((seat) => isSeatSelected(seat.id));
+}
+
+function toggleSeatUnit(unit) {
+  if (!canSelectSeatUnit(unit)) return;
+
+  if (isUnitSelected(unit)) {
+    const removeIds = new Set(unit.seats.map((seat) => seat.id));
+    selectedSeats.value = selectedSeats.value.filter((seat) => !removeIds.has(seat.id));
+    return;
+  }
+
+  for (const seat of unit.seats) {
+    if (!isSeatSelected(seat.id)) {
+      selectedSeats.value.push(seat);
+    }
   }
 }
 
-function seatClass(seat) {
-  if (seat.status === "SOLD") {
-    return "bg-red-100 border-red-300 text-red-700 cursor-not-allowed";
+function seatClass(unit) {
+  if (unit.seats.some((seat) => seat.status === "SOLD")) {
+    return "bg-slate-500 border-slate-700 text-white cursor-not-allowed";
   }
 
-  if (seat.status === "LOCKED") {
+  if (unit.seats.some((seat) => seat.status === "LOCKED")) {
     return "bg-amber-100 border-amber-300 text-amber-700 cursor-not-allowed";
   }
 
-  if (isSeatSelected(seat.id)) {
+  if (isUnitSelected(unit)) {
     return "bg-blue-500 border-blue-700 text-white shadow";
   }
 
-  if (seat.seatTypeCode === "VIP") {
-    return "bg-orange-100 border-orange-300 text-orange-700 hover:bg-orange-200";
-  }
+  const leadSeat = unit.seats[0];
 
-  if (seat.seatTypeCode === "COUPLE" || seat.seatTypeCode === "SWEETBOX") {
+  if (leadSeat.seatTypeCode === "COUPLE" || leadSeat.seatTypeCode === "SWEETBOX") {
     return "bg-rose-100 border-rose-300 text-rose-700 hover:bg-rose-200";
   }
 
+  if (leadSeat.seatTypeCode === "VIP") {
+    return "bg-orange-100 border-orange-300 text-orange-700 hover:bg-orange-200";
+  }
+
   return "bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200";
+}
+
+function seatUnitStyle(row, unitIndex) {
+  if (unitIndex === 0 && row.offset > 0) {
+    return { gridColumnStart: row.offset + 1 };
+  }
+  return null;
 }
 
 function continueToCheckout() {
@@ -243,31 +306,31 @@ onUnmounted(() => clearInterval(timerHandle));
 
           <div class="overflow-x-auto">
             <div class="mx-auto min-w-[760px] max-w-4xl space-y-2">
-              <div
-                v-for="row in rowGroups"
-                :key="row.rowLabel"
-                class="flex items-center gap-2"
-              >
+              <div v-for="row in rowGroups" :key="row.rowLabel" class="flex items-center gap-2">
                 <div class="w-6 text-center text-xs font-black text-slate-500">{{ row.rowLabel }}</div>
-                <button
-                  v-for="seat in row.seats"
-                  :key="seat.id"
-                  type="button"
-                  :disabled="!canSelectSeat(seat)"
-                  @click="toggleSeat(seat)"
-                  class="h-10 w-10 rounded-lg border-b-[3px] text-[11px] font-bold transition"
-                  :class="seatClass(seat)"
-                >
-                  <span v-if="seat.status === 'SOLD'">X</span>
-                  <span v-else>{{ seat.seatCode }}</span>
-                </button>
+                <div class="grid w-[664px] grid-cols-[repeat(14,minmax(0,1fr))] gap-2">
+                  <button
+                    v-for="(unit, unitIndex) in row.units"
+                    :key="unit.key"
+                    type="button"
+                    :disabled="!canSelectSeatUnit(unit)"
+                    @click="toggleSeatUnit(unit)"
+                    :style="seatUnitStyle(row, unitIndex)"
+                    class="h-10 w-full rounded-lg border-b-[3px] text-[11px] font-bold transition"
+                    :class="[seatClass(unit), unit.type === 'pair' ? 'col-span-2' : 'col-span-1']"
+                  >
+                    <span v-if="unit.seats.some((seat) => seat.status === 'SOLD')">X</span>
+                    <span v-else-if="unit.seats.some((seat) => seat.status === 'LOCKED')">X</span>
+                    <span v-else>{{ unit.label }}</span>
+                  </button>
+                </div>
                 <div class="w-6 text-center text-xs font-black text-slate-500">{{ row.rowLabel }}</div>
               </div>
             </div>
           </div>
 
           <div class="mt-8 flex flex-wrap justify-center gap-5 text-sm font-bold text-slate-700">
-            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-red-100 border border-red-300"></span> Booked</div>
+            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-slate-500 border border-slate-700"></span> Booked</div>
             <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-blue-500"></span> Your selection</div>
             <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-slate-100 border border-slate-300"></span> Standard</div>
             <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-orange-100 border border-orange-300"></span> VIP</div>

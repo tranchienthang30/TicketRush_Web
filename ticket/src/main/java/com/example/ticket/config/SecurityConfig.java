@@ -45,7 +45,8 @@ public class SecurityConfig {
                                 "/api/auth/logout",
                                 "/api/auth/forgot-password",
                                 "/api/auth/reset-password",
-                                "/api/auth/verify-email").permitAll()
+                                "/api/auth/verify-email",
+                                "/api/v1/payments/webhook").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/organizations/verify", "/api/providers/verify").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/home",

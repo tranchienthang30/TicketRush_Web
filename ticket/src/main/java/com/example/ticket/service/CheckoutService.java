@@ -7,11 +7,14 @@ import com.example.ticket.dto.CheckoutSummaryResponse;
 import com.example.ticket.dto.CheckoutTicketResponse;
 import com.example.ticket.exception.ApiException;
 import com.example.ticket.repository.CheckoutQueryRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vn.payos.type.PaymentLinkData;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -27,19 +30,27 @@ import java.util.UUID;
 
 @Service
 public class CheckoutService {
+    private static final Logger log = LoggerFactory.getLogger(CheckoutService.class);
     private static final ZoneId APP_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final BigDecimal HUNDRED = new BigDecimal("100");
     private static final BigDecimal SERVICE_FEE = new BigDecimal("15000.00");
     private static final Locale VIETNAM = Locale.forLanguageTag("vi-VN");
+    private static final String PAYMENT_METHOD_BANK_QR = "card";
 
     private final CheckoutQueryRepository checkoutRepository;
+    private final PayOSPaymentService payOSPaymentService;
+    private final PaymentConfirmationEmailService paymentConfirmationEmailService;
     private final int bookingLockMinutes;
 
     public CheckoutService(
             CheckoutQueryRepository checkoutRepository,
+            PayOSPaymentService payOSPaymentService,
+            PaymentConfirmationEmailService paymentConfirmationEmailService,
             @Value("${app.booking.lock-minutes:10}") int bookingLockMinutes
     ) {
         this.checkoutRepository = checkoutRepository;
+        this.payOSPaymentService = payOSPaymentService;
+        this.paymentConfirmationEmailService = paymentConfirmationEmailService;
         this.bookingLockMinutes = bookingLockMinutes;
     }
 
@@ -49,10 +60,44 @@ public class CheckoutService {
     }
 
     @Transactional
+    public void completePayOSPayment(UUID userId, long orderCode) {
+        CheckoutQueryRepository.OrderStatusRow order = checkoutRepository
+                .findOrderStatusByPayOSOrderCodeAndUserId(orderCode, userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Order not found for this payment code"));
+
+        if (isSuccessfulOrder(order.status())) {
+            return;
+        }
+
+        PaymentLinkData paymentLink = payOSPaymentService.getPaymentLinkInformation(orderCode);
+        String payOSStatus = paymentLink.getStatus();
+        if (!isSuccessfulOrder(payOSStatus)) {
+            throw new ApiException(HttpStatus.CONFLICT, "Payment is not successful yet");
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
+        int updated = checkoutRepository.markOrderPaidIfPending(order.orderId(), now);
+        if (updated == 0) {
+            CheckoutQueryRepository.OrderStatusRow latest = checkoutRepository.findOrderStatus(order.orderId())
+                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Order not found"));
+            if (!isSuccessfulOrder(latest.status())) {
+                throw new ApiException(HttpStatus.CONFLICT, "Order is not in pending state");
+            }
+            return;
+        }
+
+        checkoutRepository.issueTicketsForOrder(order.orderId(), now);
+        sendOrderSuccessEmail(order.orderId());
+    }
+
+    @Transactional
     public CheckoutResultResponse confirm(UUID userId, CheckoutConfirmRequest request) {
         CheckoutEvaluation evaluation = evaluate(userId, request.eventId(), request.seatIds(), request.voucherCode());
         OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
+        OffsetDateTime expiresAt = now.plusMinutes(bookingLockMinutes);
         UUID orderId = UUID.randomUUID();
+        boolean payWithBankQr = PAYMENT_METHOD_BANK_QR.equalsIgnoreCase(request.paymentMethod());
+        Long payosOrderCode = payWithBankQr ? payOSPaymentService.generateOrderCode(orderId) : null;
 
         for (CheckoutQueryRepository.SeatCheckoutRow seat : evaluation.seats()) {
             int updated = checkoutRepository.markSeatSold(seat.id(), evaluation.event().id());
@@ -69,18 +114,18 @@ public class CheckoutService {
                 evaluation.totalDiscount(),
                 evaluation.totalAmount(),
                 evaluation.voucher() == null ? null : evaluation.voucher().id(),
-                now.plusMinutes(bookingLockMinutes),
-                now
+                expiresAt,
+                payWithBankQr ? "PENDING" : "SUCCESS",
+                payWithBankQr ? null : now,
+                payosOrderCode
         );
 
         for (CheckoutQueryRepository.SeatCheckoutRow seat : evaluation.seats()) {
-            checkoutRepository.insertOrderItem(
+            checkoutRepository.insertOrderItemPending(
                     UUID.randomUUID(),
                     orderId,
                     seat.id(),
-                    seat.price(),
-                    generateQrCode(orderId, seat.seatCode()),
-                    now
+                    seat.price()
             );
         }
 
@@ -104,6 +149,32 @@ public class CheckoutService {
             }
         }
 
+        if (payWithBankQr) {
+            String checkoutUrl = payOSPaymentService.createCheckoutUrl(
+                    orderId,
+                    payosOrderCode,
+                    evaluation.totalAmount(),
+                    evaluation.event().title(),
+                    request.fullName().trim(),
+                    request.email().trim(),
+                    request.phone().trim(),
+                    evaluation.seats(),
+                    expiresAt
+            );
+
+            log.info("Checkout created in pending state for orderId={}, redirecting to payOS", orderId);
+            return new CheckoutResultResponse(
+                    orderId,
+                    "PENDING",
+                    now,
+                    null,
+                    toSummaryResponse(evaluation),
+                    List.of(),
+                    checkoutUrl
+            );
+        }
+
+        checkoutRepository.issueTicketsForOrder(orderId, now);
         List<CheckoutTicketResponse> tickets = checkoutRepository.findOrderTickets(orderId).stream()
                 .map(row -> new CheckoutTicketResponse(
                         row.orderItemId(),
@@ -114,15 +185,44 @@ public class CheckoutService {
                         row.issuedAt()
                 ))
                 .toList();
+        sendOrderSuccessEmail(orderId);
 
         return new CheckoutResultResponse(
                 orderId,
-                "PAID",
+                "SUCCESS",
                 now,
                 now,
                 toSummaryResponse(evaluation),
-                tickets
+                tickets,
+                null
         );
+    }
+
+    private void sendOrderSuccessEmail(UUID orderId) {
+        List<PaymentConfirmationEmailService.TicketQrItem> ticketQrItems = checkoutRepository
+                .findOrderTicketQrDetails(orderId).stream()
+                .map(ticket -> new PaymentConfirmationEmailService.TicketQrItem(
+                        ticket.seatCode(),
+                        ticket.qrCode()
+                ))
+                .toList();
+
+        checkoutRepository.findOrderEmailDetails(orderId).ifPresent(emailRow ->
+                paymentConfirmationEmailService.sendOrderSuccessEmail(
+                        new PaymentConfirmationEmailService.OrderSuccessEmailPayload(
+                                emailRow.orderId(),
+                                emailRow.email(),
+                                emailRow.fullName(),
+                                emailRow.eventTitle(),
+                                emailRow.seatCodes(),
+                                emailRow.totalAmount(),
+                                ticketQrItems
+                        )
+                ));
+    }
+
+    private boolean isSuccessfulOrder(String status) {
+        return status != null && ("SUCCESS".equalsIgnoreCase(status) || "PAID".equalsIgnoreCase(status));
     }
 
     private CheckoutEvaluation evaluate(UUID userId, UUID eventId, List<UUID> rawSeatIds, String voucherCode) {
@@ -245,11 +345,6 @@ public class CheckoutService {
         BigDecimal safeAmount = defaultMoney(amount);
         BigDecimal safePercent = defaultMoney(percent);
         return safeAmount.multiply(safePercent).divide(HUNDRED, 2, RoundingMode.HALF_UP);
-    }
-
-    private String generateQrCode(UUID orderId, String seatCode) {
-        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase(Locale.ROOT);
-        return "TR-" + orderId.toString().substring(0, 8).toUpperCase(Locale.ROOT) + "-" + seatCode + "-" + suffix;
     }
 
     private CheckoutSummaryResponse toSummaryResponse(CheckoutEvaluation evaluation) {
