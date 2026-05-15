@@ -48,7 +48,7 @@ WITH movie_data AS (
     ) AS movies(event_no, id, category_id, title, slug, description, banner_url, location_name, address, city, days_from_now, status, hall_id, room_type)
 )
 INSERT INTO events (
-    id, organizer_id, category_id, title, slug, description, banner_url,
+    id, provider_id, category_id, title, slug, description, banner_url,
     location_name, address, city, start_time, end_time, sale_start_time, sale_end_time,
     status, hall_id, created_at, updated_at
 )
