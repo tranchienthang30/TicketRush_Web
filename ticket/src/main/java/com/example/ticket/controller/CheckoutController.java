@@ -4,6 +4,7 @@ import com.example.ticket.dto.CheckoutConfirmRequest;
 import com.example.ticket.dto.CheckoutPreviewRequest;
 import com.example.ticket.dto.CheckoutResultResponse;
 import com.example.ticket.dto.CheckoutSummaryResponse;
+import com.example.ticket.dto.ApiMessageResponse;
 import com.example.ticket.service.CheckoutService;
 import com.example.ticket.service.CurrentUserService;
 import jakarta.validation.Valid;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -40,5 +42,14 @@ public class CheckoutController {
             @Valid @RequestBody CheckoutConfirmRequest request
     ) {
         return checkoutService.confirm(currentUserService.resolve(userId), request);
+    }
+
+    @PostMapping("/payos/complete")
+    public ApiMessageResponse completePayOSPayment(
+            @RequestHeader(name = "X-User-Id", required = false) UUID userId,
+            @RequestParam long orderCode
+    ) {
+        checkoutService.completePayOSPayment(currentUserService.resolve(userId), orderCode);
+        return new ApiMessageResponse("Payment completed successfully");
     }
 }

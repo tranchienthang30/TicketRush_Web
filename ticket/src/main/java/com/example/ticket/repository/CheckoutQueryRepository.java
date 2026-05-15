@@ -156,16 +156,18 @@ public class CheckoutQueryRepository {
             BigDecimal totalAmount,
             UUID voucherId,
             OffsetDateTime expiresAt,
-            OffsetDateTime paidAt
+            String status,
+            OffsetDateTime paidAt,
+            Long payosOrderCode
     ) {
         String sql = """
                 INSERT INTO orders (
                     id, user_id, event_id, status, subtotal, discount_amount, total_amount,
-                    voucher_id, expires_at, created_at, paid_at, cancelled_at
+                    voucher_id, expires_at, created_at, paid_at, cancelled_at, payos_order_code
                 )
                 VALUES (
-                    :id, :userId, :eventId, 'PAID', :subtotal, :discountAmount, :totalAmount,
-                    :voucherId, :expiresAt, now(), :paidAt, NULL
+                    :id, :userId, :eventId, CAST(:status AS order_status), :subtotal, :discountAmount, :totalAmount,
+                    :voucherId, :expiresAt, now(), :paidAt, NULL, :payosOrderCode
                 )
                 """;
 
@@ -178,16 +180,16 @@ public class CheckoutQueryRepository {
                 .addValue("totalAmount", totalAmount)
                 .addValue("voucherId", voucherId)
                 .addValue("expiresAt", expiresAt)
-                .addValue("paidAt", paidAt));
+                .addValue("status", status)
+                .addValue("paidAt", paidAt)
+                .addValue("payosOrderCode", payosOrderCode));
     }
 
-    public void insertOrderItem(
+    public void insertOrderItemPending(
             UUID id,
             UUID orderId,
             UUID eventSeatId,
-            BigDecimal priceSnapshot,
-            String qrCode,
-            OffsetDateTime issuedAt
+            BigDecimal priceSnapshot
     ) {
         String sql = """
                 INSERT INTO order_items (
@@ -195,8 +197,8 @@ public class CheckoutQueryRepository {
                     ticket_status, issued_at, checked_in_at
                 )
                 VALUES (
-                    :id, :orderId, :eventSeatId, :priceSnapshot, :qrCode,
-                    'VALID', :issuedAt, NULL
+                    :id, :orderId, :eventSeatId, :priceSnapshot, NULL,
+                    'NOT_ISSUED', NULL, NULL
                 )
                 """;
 
@@ -204,9 +206,147 @@ public class CheckoutQueryRepository {
                 .addValue("id", id)
                 .addValue("orderId", orderId)
                 .addValue("eventSeatId", eventSeatId)
-                .addValue("priceSnapshot", priceSnapshot)
-                .addValue("qrCode", qrCode)
+                .addValue("priceSnapshot", priceSnapshot));
+    }
+
+    public int markOrderPaidIfPending(UUID orderId, OffsetDateTime paidAt) {
+        String sql = """
+                UPDATE orders
+                SET status = 'SUCCESS',
+                    paid_at = :paidAt
+                WHERE id = :orderId
+                AND status = 'PENDING'
+                """;
+
+        return jdbcTemplate.update(sql, new MapSqlParameterSource()
+                .addValue("orderId", orderId)
+                .addValue("paidAt", paidAt));
+    }
+
+    public int issueTicketsForOrder(UUID orderId, OffsetDateTime issuedAt) {
+        String sql = """
+                UPDATE order_items oi
+                SET ticket_status = 'VALID',
+                    qr_code = CONCAT(
+                        'TR-',
+                        UPPER(SUBSTRING(CAST(:orderId AS TEXT), 1, 8)),
+                        '-',
+                        es.seat_code,
+                        '-',
+                        UPPER(SUBSTRING(REPLACE(CAST(gen_random_uuid() AS TEXT), '-', ''), 1, 10))
+                    ),
+                    issued_at = :issuedAt
+                FROM event_seats es
+                WHERE oi.order_id = :orderId
+                AND oi.event_seat_id = es.id
+                AND oi.ticket_status = 'NOT_ISSUED'
+                """;
+
+        return jdbcTemplate.update(sql, new MapSqlParameterSource()
+                .addValue("orderId", orderId)
                 .addValue("issuedAt", issuedAt));
+    }
+
+    public Optional<OrderStatusRow> findOrderStatus(UUID orderId) {
+        String sql = """
+                SELECT id, status::text AS status
+                FROM orders
+                WHERE id = :orderId
+                """;
+
+        List<OrderStatusRow> rows = jdbcTemplate.query(sql,
+                new MapSqlParameterSource("orderId", orderId),
+                (rs, rowNum) -> new OrderStatusRow(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("status")
+                ));
+        return rows.stream().findFirst();
+    }
+
+    public Optional<OrderStatusRow> findOrderStatusByPayOSOrderCode(Long orderCode) {
+        String sql = """
+                SELECT id, status::text AS status
+                FROM orders
+                WHERE payos_order_code = :orderCode
+                """;
+
+        List<OrderStatusRow> rows = jdbcTemplate.query(sql,
+                new MapSqlParameterSource("orderCode", orderCode),
+                (rs, rowNum) -> new OrderStatusRow(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("status")
+                ));
+        return rows.stream().findFirst();
+    }
+
+    public Optional<OrderStatusRow> findOrderStatusByPayOSOrderCodeAndUserId(Long orderCode, UUID userId) {
+        String sql = """
+                SELECT id, status::text AS status
+                FROM orders
+                WHERE payos_order_code = :orderCode
+                AND user_id = :userId
+                """;
+
+        List<OrderStatusRow> rows = jdbcTemplate.query(sql,
+                new MapSqlParameterSource()
+                        .addValue("orderCode", orderCode)
+                        .addValue("userId", userId),
+                (rs, rowNum) -> new OrderStatusRow(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("status")
+                ));
+        return rows.stream().findFirst();
+    }
+
+    public Optional<OrderEmailRow> findOrderEmailDetails(UUID orderId) {
+        String sql = """
+                SELECT
+                    o.id AS order_id,
+                    u.email,
+                    u.full_name,
+                    e.title AS event_title,
+                    COALESCE(string_agg(es.seat_code, ', ' ORDER BY es.seat_code), '') AS seat_codes,
+                    o.total_amount
+                FROM orders o
+                JOIN users u ON u.id = o.user_id
+                JOIN events e ON e.id = o.event_id
+                LEFT JOIN order_items oi ON oi.order_id = o.id
+                LEFT JOIN event_seats es ON es.id = oi.event_seat_id
+                WHERE o.id = :orderId
+                GROUP BY o.id, u.email, u.full_name, e.title, o.total_amount
+                """;
+
+        List<OrderEmailRow> rows = jdbcTemplate.query(sql,
+                new MapSqlParameterSource("orderId", orderId),
+                (rs, rowNum) -> new OrderEmailRow(
+                        rs.getObject("order_id", UUID.class),
+                        rs.getString("email"),
+                        rs.getString("full_name"),
+                        rs.getString("event_title"),
+                        rs.getString("seat_codes"),
+                        rs.getBigDecimal("total_amount")
+                ));
+
+        return rows.stream().findFirst();
+    }
+
+    public List<OrderTicketQrRow> findOrderTicketQrDetails(UUID orderId) {
+        String sql = """
+                SELECT
+                    es.seat_code,
+                    oi.qr_code
+                FROM order_items oi
+                JOIN event_seats es ON es.id = oi.event_seat_id
+                WHERE oi.order_id = :orderId
+                ORDER BY es.seat_code
+                """;
+
+        return jdbcTemplate.query(sql,
+                new MapSqlParameterSource("orderId", orderId),
+                (rs, rowNum) -> new OrderTicketQrRow(
+                        rs.getString("seat_code"),
+                        rs.getString("qr_code")
+                ));
     }
 
     public int incrementVoucherUsage(UUID voucherId) {
@@ -337,6 +477,28 @@ public class CheckoutQueryRepository {
             String ticketStatus,
             String qrCode,
             OffsetDateTime issuedAt
+    ) {
+    }
+
+    public record OrderStatusRow(
+            UUID orderId,
+            String status
+    ) {
+    }
+
+    public record OrderEmailRow(
+            UUID orderId,
+            String email,
+            String fullName,
+            String eventTitle,
+            String seatCodes,
+            BigDecimal totalAmount
+    ) {
+    }
+
+    public record OrderTicketQrRow(
+            String seatCode,
+            String qrCode
     ) {
     }
 }

@@ -6,6 +6,15 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "Khởi động Docker Compose từ thư mục gốc..."
 cd "$SCRIPT_DIR"
+
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  echo "Nạp biến môi trường từ file .env..."
+  set -a
+  # shellcheck disable=SC1091
+  . "$SCRIPT_DIR/.env"
+  set +a
+fi
+
 docker compose up -d
 
 echo "Chờ database khởi động (5 giây)..."

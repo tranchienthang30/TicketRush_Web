@@ -10,6 +10,7 @@ public record CheckoutResultResponse(
         OffsetDateTime createdAt,
         OffsetDateTime paidAt,
         CheckoutSummaryResponse summary,
-        List<CheckoutTicketResponse> tickets
+        List<CheckoutTicketResponse> tickets,
+        String checkoutUrl
 ) {
 }

@@ -73,19 +73,19 @@ public class ProfileQueryRepository {
                         JOIN events e ON e.id = o.event_id
                         JOIN order_items oi ON oi.order_id = o.id
                         WHERE o.user_id = :userId
-                        AND o.status IN ('PAID', 'PENDING')
+                        AND o.status IN ('PAID', 'SUCCESS', 'PENDING')
                         AND oi.ticket_status IN ('VALID', 'NOT_ISSUED')
                         AND e.start_time >= now()
                     ), 0) AS upcoming_events,
                     COALESCE((
                         SELECT SUM(o.discount_amount)
                         FROM orders o
-                        WHERE o.user_id = :userId AND o.status = 'PAID'
+                        WHERE o.user_id = :userId AND o.status IN ('PAID', 'SUCCESS')
                     ), 0) AS savings,
                     COALESCE((
                         SELECT SUM(o.total_amount)
                         FROM orders o
-                        WHERE o.user_id = :userId AND o.status = 'PAID'
+                        WHERE o.user_id = :userId AND o.status IN ('PAID', 'SUCCESS')
                     ), 0) AS total_spent
                 """;
 
@@ -122,7 +122,7 @@ public class ProfileQueryRepository {
                 JOIN order_items oi ON oi.order_id = o.id
                 JOIN event_seats es ON es.id = oi.event_seat_id
                 WHERE o.user_id = :userId
-                AND o.status IN ('PAID', 'PENDING')
+                AND o.status IN ('PAID', 'SUCCESS', 'PENDING')
                 AND oi.ticket_status IN ('VALID', 'USED', 'NOT_ISSUED')
                 %s
                 GROUP BY o.id, e.id, e.slug, e.title, e.start_time, e.location_name, e.city, e.address, o.status, e.banner_url
