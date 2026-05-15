@@ -10,6 +10,10 @@ public record EventCardResponse(
         String location,
         String price,
         String tag,
-        String image
+        String image,
+        String category,
+        Integer durationMinutes,
+        String listingType,
+        boolean bookable
 ) {
 }

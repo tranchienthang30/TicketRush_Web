@@ -57,6 +57,13 @@ public class Event {
     @Column(name = "banner_url")
     private String bannerUrl;
 
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
+
+    @Column(name = "listing_type", nullable = false)
+    @Builder.Default
+    private String listingType = "NOW_SHOWING";
+
     @Column(name = "location_name")
     private String locationName;
 

@@ -93,6 +93,9 @@ public class EventQueryRepository {
                 LEFT JOIN cinema_halls ch ON ch.id = e.hall_id
                 WHERE e.id = :eventId
                 AND e.status = 'PUBLISHED'
+                AND COALESCE(e.listing_type, 'NOW_SHOWING') <> 'UPCOMING'
+                AND (e.sale_start_time IS NULL OR e.sale_start_time <= now())
+                AND (e.sale_end_time IS NULL OR e.sale_end_time >= now())
                 """;
 
         List<BookingEventRow> rows = jdbcTemplate.query(sql,
@@ -147,6 +150,9 @@ public class EventQueryRepository {
                     e.slug,
                     e.title,
                     e.start_time,
+                    c.name AS category_name,
+                    COALESCE(e.duration_minutes, GREATEST(1, ROUND(EXTRACT(EPOCH FROM (e.end_time - e.start_time)) / 60)::int)) AS duration_minutes,
+                    COALESCE(e.listing_type, 'NOW_SHOWING') AS listing_type,
                     COALESCE(NULLIF(e.location_name, ''), NULLIF(e.city, ''), e.address) AS location,
                     e.city,
                     e.banner_url,
@@ -156,6 +162,7 @@ public class EventQueryRepository {
                     (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'AVAILABLE') AS available_seats,
                     (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'SOLD') AS sold_seats
                 FROM events e
+                    LEFT JOIN categories c ON c.id = e.category_id
                 WHERE e.status = 'PUBLISHED'
                 AND %s
                 """.formatted(extraWhereAndOrder);
@@ -217,7 +224,10 @@ public class EventQueryRepository {
                 rs.getObject("sale_end_time", OffsetDateTime.class),
                 rs.getBigDecimal("min_price"),
                 rs.getLong("available_seats"),
-                rs.getLong("sold_seats")
+                rs.getLong("sold_seats"),
+                rs.getString("category_name"),
+                rs.getObject("duration_minutes", Integer.class),
+                rs.getString("listing_type")
         );
     }
 
@@ -280,7 +290,10 @@ public class EventQueryRepository {
             OffsetDateTime saleEndTime,
             BigDecimal minPrice,
             long availableSeats,
-            long soldSeats
+            long soldSeats,
+            String categoryName,
+            Integer durationMinutes,
+            String listingType
     ) {
     }
 

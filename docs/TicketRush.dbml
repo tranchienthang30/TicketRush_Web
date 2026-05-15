@@ -165,6 +165,8 @@ Table events {
   slug varchar(300) [not null, unique]
   description text
   banner_url text
+  duration_minutes int
+  listing_type varchar(30) [not null, default: 'NOW_SHOWING']
 
   location_name varchar(255)
   address text
@@ -186,9 +188,11 @@ Table events {
     category_id
     slug
     status
+    listing_type
     city
     start_time
     (status, start_time)
+    (status, listing_type, start_time)
     (category_id, status)
     (organizer_id, status)
   }
