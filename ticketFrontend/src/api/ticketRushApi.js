@@ -72,6 +72,13 @@ export async function confirmCheckout(payload) {
   return data;
 }
 
+export async function completePayOSCheckout(orderCode) {
+  const { data } = await apiClient.post("/api/me/checkout/payos/complete", null, {
+    params: { orderCode },
+  });
+  return data;
+}
+
 export async function updateProfile(payload) {
   const { data } = await apiClient.put("/api/me", payload);
   return data;
