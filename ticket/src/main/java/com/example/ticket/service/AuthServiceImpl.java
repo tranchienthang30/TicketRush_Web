@@ -32,6 +32,7 @@ public class AuthServiceImpl implements AuthService {
     private final TokenBlacklistService tokenBlacklistService;
     private final SessionPolicyService sessionPolicyService;
     private final AccountVerificationService accountVerificationService;
+    private final ProviderNotificationService providerNotificationService;
 
     public AuthServiceImpl(
             UserRepository userRepository,
@@ -39,7 +40,8 @@ public class AuthServiceImpl implements AuthService {
             JwtTokenProvider jwtTokenProvider,
             TokenBlacklistService tokenBlacklistService,
             SessionPolicyService sessionPolicyService,
-            AccountVerificationService accountVerificationService
+            AccountVerificationService accountVerificationService,
+            ProviderNotificationService providerNotificationService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -47,6 +49,7 @@ public class AuthServiceImpl implements AuthService {
         this.tokenBlacklistService = tokenBlacklistService;
         this.sessionPolicyService = sessionPolicyService;
         this.accountVerificationService = accountVerificationService;
+        this.providerNotificationService = providerNotificationService;
     }
 
     @Override
@@ -70,6 +73,9 @@ public class AuthServiceImpl implements AuthService {
 
         userRepository.save(user);
         accountVerificationService.sendVerificationEmail(user);
+        if (Boolean.TRUE.equals(request.requestProviderAccess())) {
+            providerNotificationService.notifyRequestSubmitted(user);
+        }
         return createAuthResponse(user);
     }
 
@@ -140,10 +146,6 @@ public class AuthServiceImpl implements AuthService {
             user.setAvatarUrl(avatarUrl);
             changed = true;
         }
-        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
-            user.setEmailVerified(true);
-            changed = true;
-        }
         if ((user.getFullName() == null || user.getFullName().isBlank()) && fullName != null && !fullName.isBlank()) {
             user.setFullName(fullName.trim());
             changed = true;
@@ -211,16 +213,20 @@ public class AuthServiceImpl implements AuthService {
     private User findOrCreateGoogleUser(String email, String fullName, String providerId, String avatarUrl) {
         return userRepository.findByEmailIgnoreCase(email)
                 .map(existing -> attachGoogleProvider(existing, providerId, avatarUrl))
-                .orElseGet(() -> userRepository.save(User.builder()
-                        .email(email)
-                        .passwordHash(null)
-                        .fullName((fullName == null || fullName.isBlank()) ? email : fullName.trim())
-                        .avatarUrl(blankToNull(avatarUrl))
-                        .provider(AuthProvider.GOOGLE)
-                        .providerId(providerId)
-                        .status(UserStatus.ACTIVE)
-                        .emailVerified(true)
-                        .build()));
+                .orElseGet(() -> {
+                    User user = userRepository.save(User.builder()
+                            .email(email)
+                            .passwordHash(null)
+                            .fullName((fullName == null || fullName.isBlank()) ? email : fullName.trim())
+                            .avatarUrl(blankToNull(avatarUrl))
+                            .provider(AuthProvider.GOOGLE)
+                            .providerId(providerId)
+                            .status(UserStatus.ACTIVE)
+                            .emailVerified(false)
+                            .build());
+                    accountVerificationService.sendVerificationEmail(user);
+                    return user;
+                });
     }
 
     private User attachGoogleProvider(User existing, String providerId, String avatarUrl) {
@@ -229,7 +235,6 @@ public class AuthServiceImpl implements AuthService {
         }
         existing.setProvider(AuthProvider.GOOGLE);
         existing.setProviderId(providerId);
-        existing.setEmailVerified(true);
         if (avatarUrl != null && !avatarUrl.isBlank()) {
             existing.setAvatarUrl(avatarUrl);
         }

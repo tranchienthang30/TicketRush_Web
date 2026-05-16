@@ -26,7 +26,9 @@ public class ProfileQueryRepository {
     public Optional<ProfileResponse> findProfile(UUID userId) {
         String sql = """
                 SELECT id, email, full_name, avatar_url, phone, gender, date_of_birth,
-                       role::text AS role, status::text AS status, created_at, updated_at
+                       role::text AS role, status::text AS status, email_verified,
+                       provider_request_status, provider_requested_at, provider_reviewed_at,
+                       provider_rejection_reason, created_at, updated_at
                 FROM users
                 WHERE id = :userId
                 """;
@@ -73,31 +75,19 @@ public class ProfileQueryRepository {
                         JOIN events e ON e.id = o.event_id
                         JOIN order_items oi ON oi.order_id = o.id
                         WHERE o.user_id = :userId
-<<<<<<< HEAD
-                        AND o.status IN ('PAID', 'PENDING')
-=======
                         AND o.status IN ('PAID', 'SUCCESS', 'PENDING')
->>>>>>> f3c1cd8cfac6f82f993fe8c727f8f8cdde7f8dbc
                         AND oi.ticket_status IN ('VALID', 'NOT_ISSUED')
                         AND e.start_time >= now()
                     ), 0) AS upcoming_events,
                     COALESCE((
                         SELECT SUM(o.discount_amount)
                         FROM orders o
-<<<<<<< HEAD
-                        WHERE o.user_id = :userId AND o.status = 'PAID'
-=======
                         WHERE o.user_id = :userId AND o.status IN ('PAID', 'SUCCESS')
->>>>>>> f3c1cd8cfac6f82f993fe8c727f8f8cdde7f8dbc
                     ), 0) AS savings,
                     COALESCE((
                         SELECT SUM(o.total_amount)
                         FROM orders o
-<<<<<<< HEAD
-                        WHERE o.user_id = :userId AND o.status = 'PAID'
-=======
                         WHERE o.user_id = :userId AND o.status IN ('PAID', 'SUCCESS')
->>>>>>> f3c1cd8cfac6f82f993fe8c727f8f8cdde7f8dbc
                     ), 0) AS total_spent
                 """;
 
@@ -134,11 +124,7 @@ public class ProfileQueryRepository {
                 JOIN order_items oi ON oi.order_id = o.id
                 JOIN event_seats es ON es.id = oi.event_seat_id
                 WHERE o.user_id = :userId
-<<<<<<< HEAD
-                AND o.status IN ('PAID', 'PENDING')
-=======
                 AND o.status IN ('PAID', 'SUCCESS', 'PENDING')
->>>>>>> f3c1cd8cfac6f82f993fe8c727f8f8cdde7f8dbc
                 AND oi.ticket_status IN ('VALID', 'USED', 'NOT_ISSUED')
                 %s
                 GROUP BY o.id, e.id, e.slug, e.title, e.start_time, e.location_name, e.city, e.address, o.status, e.banner_url
@@ -273,6 +259,11 @@ public class ProfileQueryRepository {
                 rs.getObject("date_of_birth", LocalDate.class),
                 rs.getString("role"),
                 rs.getString("status"),
+                rs.getBoolean("email_verified"),
+                rs.getString("provider_request_status"),
+                rs.getObject("provider_requested_at", OffsetDateTime.class),
+                rs.getObject("provider_reviewed_at", OffsetDateTime.class),
+                rs.getString("provider_rejection_reason"),
                 rs.getObject("created_at", OffsetDateTime.class),
                 rs.getObject("updated_at", OffsetDateTime.class)
         );

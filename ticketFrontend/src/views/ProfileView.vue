@@ -1,10 +1,15 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { getProfileDashboard } from "../api/ticketRushApi";
+import * as providerApi from "@/api/provider.api";
+import { useAuthStore } from "@/stores/authStore";
 
+const authStore = useAuthStore();
 const dashboard = ref(null);
 const loading = ref(true);
 const error = ref("");
+const providerActionLoading = ref(false);
+const providerMessage = ref("");
 
 const profile = computed(() => dashboard.value?.profile || {});
 const membership = computed(() => dashboard.value?.membership || null);
@@ -27,24 +32,26 @@ const accountDetails = computed(() => [
   { label: "Primary email", value: displayProfile.value.email || "Not updated" },
   { label: "Phone number", value: displayProfile.value.phone },
   { label: "Role", value: profile.value.role || "CUSTOMER" },
+  { label: "Email status", value: profile.value.emailVerified ? "Verified" : "Verification pending" },
+  { label: "Provider status", value: providerStatusLabel.value },
   { label: "Current tier", value: displayProfile.value.membership },
 ]);
 
-const membershipBenefits = computed(() => {
-  if (!membership.value?.active) {
-    return [
-      "Choose a membership plan to unlock discounts",
-      "Member vouchers become available after subscribing",
-      "Your active tier will appear here automatically",
-    ];
-  }
+const providerStatus = computed(() =>
+  profile.value.providerRequestStatus || authStore.user?.providerRequestStatus || null
+);
 
-  return [
-    `${membership.value.discountPercent}% discount on eligible orders`,
-    `Active until ${displayProfile.value.renewalDate}`,
-    "Priority membership benefits are applied from the API",
-  ];
+const providerStatusLabel = computed(() => {
+  if (profile.value.role === "PROVIDER") return "Approved";
+  if (providerStatus.value === "PENDING") return "Waiting for admin's approval";
+  if (providerStatus.value === "REJECTED") return "Rejected";
+  if (providerStatus.value === "APPROVED") return "Approved";
+  return "Not requested";
 });
+
+const canRequestProvider = computed(() =>
+  profile.value.role === "CUSTOMER" && providerStatus.value !== "PENDING"
+);
 
 async function loadDashboard() {
   loading.value = true;
@@ -56,6 +63,30 @@ async function loadDashboard() {
     error.value = "Could not load profile data. Please check the backend API.";
   } finally {
     loading.value = false;
+  }
+}
+
+async function requestProviderAccess() {
+  providerActionLoading.value = true;
+  providerMessage.value = "";
+  error.value = "";
+
+  try {
+    const response = await providerApi.requestProviderAccess();
+    const updatedUser = response.data.data;
+    authStore.setUser(updatedUser);
+    dashboard.value = {
+      ...dashboard.value,
+      profile: {
+        ...profile.value,
+        ...updatedUser,
+      },
+    };
+    providerMessage.value = response.data.message || "Provider request has been submitted.";
+  } catch (err) {
+    error.value = err.response?.data?.message || "Unable to submit provider request.";
+  } finally {
+    providerActionLoading.value = false;
   }
 }
 
@@ -222,28 +253,53 @@ onMounted(loadDashboard);
               class="rounded-[2rem] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-700 dark:bg-slate-800"
             >
               <p class="text-sm font-black uppercase tracking-[0.35em] text-brand-orange">
-                Membership perks
+                Provider access
               </p>
-              <ul class="mt-5 space-y-4">
-                <li
-                  v-for="benefit in membershipBenefits"
-                  :key="benefit"
-                  class="flex items-start gap-3 text-sm leading-7 text-slate-600 dark:text-slate-300"
-                >
-                  <span
-                    class="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-orange/10 text-xs font-black text-brand-orange"
-                  >
-                    OK
-                  </span>
-                  <span>{{ benefit }}</span>
-                </li>
-              </ul>
+              <h2 class="mt-3 text-2xl font-black text-brand-navy dark:text-white">
+                {{ providerStatusLabel }}
+              </h2>
+              <p class="mt-4 text-sm leading-7 text-slate-600 dark:text-slate-300">
+                Providers can create events and manage their own listings after admin approval.
+                TicketRush will send an email verification link again when you request access.
+              </p>
+
+              <p
+                v-if="providerStatus === 'PENDING'"
+                class="mt-5 rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700"
+              >
+                Waiting for admin's approval. You can continue booking tickets as a customer.
+              </p>
+
+              <p
+                v-if="providerStatus === 'REJECTED' && profile.providerRejectionReason"
+                class="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700"
+              >
+                {{ profile.providerRejectionReason }}
+              </p>
+
+              <p
+                v-if="providerMessage"
+                class="mt-5 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-bold text-green-700"
+              >
+                {{ providerMessage }}
+              </p>
+
+              <button
+                v-if="canRequestProvider"
+                type="button"
+                :disabled="providerActionLoading"
+                class="mt-6 inline-flex rounded-2xl bg-brand-orange px-5 py-3 text-sm font-black uppercase tracking-[0.18em] text-white transition hover:bg-orange-600 disabled:opacity-60"
+                @click="requestProviderAccess"
+              >
+                {{ providerActionLoading ? "Submitting..." : "Becoming Providers" }}
+              </button>
 
               <router-link
-                to="/membership"
+                v-else-if="profile.role === 'PROVIDER'"
+                to="/create-movie"
                 class="mt-6 inline-flex rounded-2xl bg-brand-orange px-5 py-3 text-sm font-black uppercase tracking-[0.18em] text-white transition hover:bg-orange-600"
               >
-                Manage membership
+                Creating
               </router-link>
             </div>
           </aside>

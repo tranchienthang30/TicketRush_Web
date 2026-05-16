@@ -13,7 +13,7 @@ onMounted(async () => {
     const response = await eventApi.getMyEvents();
     events.value = response.data;
   } catch (err) {
-    error.value = err.response?.data?.message || "Unable to load your movies.";
+    error.value = err.response?.data?.message || "Unable to load your events.";
   } finally {
     loading.value = false;
   }
@@ -42,16 +42,16 @@ function formatListingType(type) {
 <template>
   <div class="max-w-6xl mx-auto p-6">
     <div class="flex items-center justify-between gap-4 mb-6">
-      <h1 class="text-3xl font-black text-brand-navy dark:text-white">Cinemas Management</h1>
+      <h1 class="text-3xl font-black text-brand-navy dark:text-white">Managements</h1>
       <RouterLink to="/create-movie" class="rounded-xl bg-brand-orange px-5 py-3 font-black text-white hover:bg-orange-600">
-        Create Movie
+        Create Event
       </RouterLink>
     </div>
 
-    <p v-if="loading" class="text-gray-500">Loading movies...</p>
+    <p v-if="loading" class="text-gray-500">Loading events...</p>
     <p v-else-if="error" class="text-red-600">{{ error }}</p>
     <div v-else-if="events.length === 0" class="text-gray-500">
-      You have not created any movies yet.
+      You have not created any events yet.
     </div>
 
     <div v-else class="grid gap-4">

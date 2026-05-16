@@ -83,10 +83,7 @@ public class EventServiceImpl implements EventService {
     public EventResponse createEvent(CreateEventRequest request) {
         User user = currentUser();
         if (user.getRole() != UserRole.PROVIDER && user.getRole() != UserRole.ADMIN) {
-            throw new AppException(HttpStatus.FORBIDDEN, "You need provider access before creating movies");
-        }
-        if (user.getPrimaryOrganizationId() == null && user.getRole() != UserRole.ADMIN) {
-            throw new AppException(HttpStatus.FORBIDDEN, "You need a verified business profile before creating movies");
+            throw new AppException(HttpStatus.FORBIDDEN, "You need approved provider access before creating events");
         }
         if (!categoryRepository.existsById(request.categoryId())) {
             throw new AppException(HttpStatus.BAD_REQUEST, "Category does not exist");
@@ -102,7 +99,7 @@ public class EventServiceImpl implements EventService {
 
         Event event = Event.builder()
                 .providerId(user.getId())
-                .organizationId(user.getPrimaryOrganizationId())
+                .organizationId(null)
                 .categoryId(request.categoryId())
                 .title(request.title().trim())
                 .slug(uniqueSlug(request.title()))

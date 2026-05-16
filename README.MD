@@ -42,3 +42,14 @@ cd frontend
 - Open docker desktop
 - Use git bash
 > ./auto.sh
+
+## 1 tài khoản admin để test phân quyền: 
+>chạy truy vấn sql: UPDATE users
+SET role = 'ADMIN',
+    provider_request_status = NULL,
+    provider_requested_at = NULL,
+    provider_reviewed_at = NULL,
+    provider_reviewed_by = NULL,
+    provider_rejection_reason = NULL,
+    email_verified = true
+WHERE email = '@example.com';

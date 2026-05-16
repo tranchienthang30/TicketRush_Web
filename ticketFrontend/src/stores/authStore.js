@@ -75,6 +75,12 @@ export const useAuthStore = defineStore("auth", () => {
     clearSessionTimers();
   }
 
+  function setUser(nextUser) {
+    user.value = nextUser;
+    hasCheckedAuth.value = true;
+    scheduleCustomerSessionWarnings();
+  }
+
   async function runAuthRequest(requester) {
     loading.value = true;
     error.value = "";
@@ -108,6 +114,7 @@ export const useAuthStore = defineStore("auth", () => {
     fetchCurrentUser,
     logoutUser,
     clearSession,
+    setUser,
   };
 
   function scheduleCustomerSessionWarnings() {
@@ -124,7 +131,7 @@ export const useAuthStore = defineStore("auth", () => {
       const remainingMs = expiresAt - Date.now();
 
       if (remainingMs <= 0) {
-        sessionNotice.value = "Your 15-minute customer session has expired. Please sign in again.";
+        sessionNotice.value = "Your customer session has expired. Please sign in again.";
         await logoutUser();
         window.location.assign("/login?reason=session-expired");
         return;
@@ -134,7 +141,7 @@ export const useAuthStore = defineStore("auth", () => {
       for (const threshold of [10, 5]) {
         if (remainingMinutes <= threshold && !notifiedThresholds.has(threshold)) {
           notifiedThresholds.add(threshold);
-          sessionNotice.value = `For security, customer sessions expire after 15 minutes. About ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"} remaining.`;
+          sessionNotice.value = `For security, customer sessions expire automatically. About ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"} remaining.`;
           break;
         }
       }

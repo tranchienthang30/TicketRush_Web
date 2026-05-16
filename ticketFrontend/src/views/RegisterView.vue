@@ -60,7 +60,7 @@ async function handleRegister() {
           Create account
         </h1>
         <p class="text-gray-500 dark:text-gray-400 mt-2">
-          Create an account to book movie seats and save your tickets.
+          Create an account to book seats and save your tickets.
         </p>
       </div>
 
@@ -124,7 +124,7 @@ async function handleRegister() {
             class="mt-1 h-4 w-4 rounded border-slate-300 text-brand-orange focus:ring-brand-orange"
           />
           <span>
-            I want to register as a movie provider. TicketRush will record this request for admin review.
+            I want to become a provider. TicketRush will record this request for admin review.
           </span>
         </label>
 

@@ -20,7 +20,10 @@ public record UserResponse(
         boolean emailVerified,
         UUID primaryOrganizationId,
         String providerRequestStatus,
-        Instant providerRequestedAt
+        Instant providerRequestedAt,
+        Instant providerReviewedAt,
+        UUID providerReviewedBy,
+        String providerRejectionReason
 ) {
     public static UserResponse from(User user) {
         return from(user, null);
@@ -40,7 +43,10 @@ public record UserResponse(
                 Boolean.TRUE.equals(user.getEmailVerified()),
                 user.getPrimaryOrganizationId(),
                 user.getProviderRequestStatus(),
-                user.getProviderRequestedAt()
+                user.getProviderRequestedAt(),
+                user.getProviderReviewedAt(),
+                user.getProviderReviewedBy(),
+                user.getProviderRejectionReason()
         );
     }
 }

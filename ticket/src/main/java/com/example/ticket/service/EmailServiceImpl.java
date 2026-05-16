@@ -14,13 +14,16 @@ import org.springframework.stereotype.Service;
 public class EmailServiceImpl implements EmailService {
     private final JavaMailSender mailSender;
     private final String fromAddress;
+    private final String overrideTo;
 
     public EmailServiceImpl(
             JavaMailSender mailSender,
-            @Value("${app.mail.from:no-reply@ticketrush.local}") String fromAddress
+            @Value("${app.mail.from:no-reply@ticketrush.local}") String fromAddress,
+            @Value("${app.mail.override-to:}") String overrideTo
     ) {
         this.mailSender = mailSender;
         this.fromAddress = fromAddress;
+        this.overrideTo = overrideTo;
     }
 
     @Override
@@ -50,14 +53,55 @@ public class EmailServiceImpl implements EmailService {
         ));
     }
 
+    @Override
+    public void sendProviderRequestSubmittedEmail(String to, String fullName) {
+        sendHtml(to, "TicketRush provider request received", buildNoticeHtml(
+                "Provider request received",
+                fullName,
+                "Your provider access request has been sent to the admin team. You can keep using TicketRush as a customer while waiting for approval."
+        ));
+    }
+
+    @Override
+    public void sendProviderRequestAdminEmail(String to, String fullName, String requesterEmail) {
+        sendHtml(to, "New TicketRush provider request", buildNoticeHtml(
+                "New provider request",
+                "Admin",
+                "%s (%s) requested provider access. Review this request in the admin approval page."
+                        .formatted(fullName == null || fullName.isBlank() ? "A user" : fullName, requesterEmail)
+        ));
+    }
+
+    @Override
+    public void sendProviderApprovedEmail(String to, String fullName) {
+        sendHtml(to, "Your TicketRush provider request was approved", buildNoticeHtml(
+                "Provider request approved",
+                fullName,
+                "Your account now has provider access. You can create events and manage your event listings from TicketRush."
+        ));
+    }
+
+    @Override
+    public void sendProviderRejectedEmail(String to, String fullName, String reason) {
+        String message = "Your provider request was not approved at this time.";
+        if (reason != null && !reason.isBlank()) {
+            message += " Reason: " + reason.trim();
+        }
+        sendHtml(to, "Your TicketRush provider request was reviewed", buildNoticeHtml(
+                "Provider request reviewed",
+                fullName,
+                message
+        ));
+    }
+
     private void sendHtml(String to, String subject, String html) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
             helper.setFrom(fromAddress);
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(html, true);
+            helper.setTo(resolveRecipient(to));
+            helper.setSubject(resolveSubject(subject, to));
+            helper.setText(resolveBody(html, to), true);
             mailSender.send(message);
         } catch (MessagingException | MailException ex) {
             throw new AppException(
@@ -65,6 +109,33 @@ public class EmailServiceImpl implements EmailService {
                     "Email service is unavailable. Please check SMTP configuration."
             );
         }
+    }
+
+    private String resolveRecipient(String to) {
+        if (overrideTo == null || overrideTo.isBlank()) {
+            return to;
+        }
+        return overrideTo.trim();
+    }
+
+    private String resolveSubject(String subject, String originalTo) {
+        if (overrideTo == null || overrideTo.isBlank() || overrideTo.trim().equalsIgnoreCase(originalTo)) {
+            return subject;
+        }
+        return "[DEV to " + originalTo + "] " + subject;
+    }
+
+    private String resolveBody(String html, String originalTo) {
+        if (overrideTo == null || overrideTo.isBlank() || overrideTo.trim().equalsIgnoreCase(originalTo)) {
+            return html;
+        }
+        return html.replace(
+                "<body style=\"margin:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#172033;\">",
+                "<body style=\"margin:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#172033;\">"
+                        + "<div style=\"background:#fff7ed;color:#9a3412;padding:10px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;text-align:center;\">"
+                        + "Development mail redirected. Original recipient: " + escapeHtml(originalTo)
+                        + "</div>"
+        );
     }
 
     private String buildPasswordResetHtml(String fullName, String resetLink) {
@@ -150,6 +221,37 @@ public class EmailServiceImpl implements EmailService {
                 </body>
                 </html>
                 """.formatted(escapeHtml(title), displayName, escapeHtml(body), link, escapeHtml(cta), link);
+    }
+
+    private String buildNoticeHtml(String title, String name, String body) {
+        String displayName = (name == null || name.isBlank()) ? "there" : escapeHtml(name);
+        return """
+                <!doctype html>
+                <html>
+                <body style="margin:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+                  <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#f4f6f8;padding:32px 16px;">
+                    <tr>
+                      <td align="center">
+                        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+                          <tr>
+                            <td style="background:#0f172a;color:#ffffff;padding:24px 28px;font-size:24px;font-weight:800;">
+                              STAR<span style="color:#f97316;">LIGHT</span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding:28px;">
+                              <h1 style="margin:0 0 12px;font-size:24px;color:#0f172a;">%s</h1>
+                              <p style="margin:0 0 18px;line-height:1.6;color:#475569;">Hi %s,</p>
+                              <p style="margin:0;line-height:1.6;color:#475569;">%s</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(escapeHtml(title), displayName, escapeHtml(body));
     }
 
     private String escapeHtml(String value) {

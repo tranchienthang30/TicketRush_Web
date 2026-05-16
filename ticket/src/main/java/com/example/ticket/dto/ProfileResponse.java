@@ -14,6 +14,11 @@ public record ProfileResponse(
         LocalDate dateOfBirth,
         String role,
         String status,
+        boolean emailVerified,
+        String providerRequestStatus,
+        OffsetDateTime providerRequestedAt,
+        OffsetDateTime providerReviewedAt,
+        String providerRejectionReason,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
