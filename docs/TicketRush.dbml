@@ -1,0 +1,609 @@
+Project TicketRush_Simplified {
+  database_type: "PostgreSQL"
+  Note: '''
+  TicketRush - Online Event Ticket Booking System
+
+  Mục tiêu:
+  - Gọn, dễ triển khai cho nhóm 3 người.
+  - Đủ cho user, event, category, seat map, booking, order, ticket QR, membership, voucher.
+  - PostgreSQL là source of truth.
+  - Redis dùng ngoài DB cho cache, queue, realtime seat update, refresh token/rate limit.
+
+  Thiết kế này bỏ bớt:
+  - roles/user_roles: gộp role vào users.
+  - venues/venue_seats: mỗi event tự có seat map riêng.
+  - payments: checkout giả lập, dùng orders.status = PAID.
+  - tickets: gộp vé QR vào order_items.
+  '''
+}
+
+/* =========================
+   ENUMS
+========================= */
+
+Enum user_role {
+  CUSTOMER
+  ORGANIZER
+  ADMIN
+}
+
+Enum user_status {
+  ACTIVE
+  BLOCKED
+}
+
+Enum auth_provider {
+  LOCAL
+  GOOGLE
+}
+
+Enum event_status {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  FINISHED
+}
+
+Enum seat_status {
+  AVAILABLE
+  LOCKED
+  SOLD
+}
+
+Enum order_status {
+  PENDING
+  PAID
+  EXPIRED
+  CANCELLED
+}
+
+Enum ticket_status {
+  NOT_ISSUED
+  VALID
+  USED
+  CANCELLED
+}
+
+Enum discount_type {
+  PERCENT
+  FIXED
+}
+
+Enum membership_status {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+/* =========================
+   USERS
+========================= */
+
+Table users {
+  id uuid [pk]
+
+  email varchar(255) [not null, unique]
+  password_hash varchar(255)
+
+  full_name varchar(255) [not null]
+  avatar_url text
+  phone varchar(30)
+  gender varchar(20)
+  date_of_birth date
+
+  role user_role [not null, default: 'CUSTOMER']
+  status user_status [not null, default: 'ACTIVE']
+
+  provider auth_provider [not null, default: 'LOCAL']
+  provider_id varchar(255)
+
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    email
+    role
+    status
+    (provider, provider_id) [unique]
+  }
+
+  Note: '''
+  Gộp authentication, profile và role vào một bảng để đơn giản.
+
+  CUSTOMER:
+  - Xem event
+  - Đặt vé
+  - Quản lý vé của mình
+
+  ORGANIZER:
+  - Có thể tạo event
+  - Quản lý event do mình tạo
+  - Vẫn có thể đặt vé như CUSTOMER
+
+  ADMIN:
+  - Quản trị toàn hệ thống
+  - Quản lý user, event, category, dashboard
+  '''
+}
+
+/* =========================
+   CATEGORY, EVENT
+========================= */
+
+Table categories {
+  id bigint [pk]
+
+  name varchar(100) [not null, unique]
+  slug varchar(120) [not null, unique]
+  description text
+  image_url text
+  is_active boolean [not null, default: true]
+
+  created_at timestamptz [not null]
+
+  indexes {
+    slug
+    is_active
+  }
+
+  Note: '''
+  Danh mục sự kiện.
+  Ví dụ: Music, Concert, Workshop, Sport, Theater.
+
+  Để đơn giản, mỗi event thuộc một category.
+  Nếu sau này muốn một event có nhiều category, mới thêm event_categories.
+  '''
+}
+
+Table events {
+  id uuid [pk]
+
+  organizer_id uuid [not null]
+  category_id bigint [not null]
+
+  title varchar(255) [not null]
+  slug varchar(300) [not null, unique]
+  description text
+  banner_url text
+  duration_minutes int
+  listing_type varchar(30) [not null, default: 'NOW_SHOWING']
+
+  location_name varchar(255)
+  address text
+  city varchar(100)
+
+  start_time timestamptz [not null]
+  end_time timestamptz [not null]
+
+  sale_start_time timestamptz
+  sale_end_time timestamptz
+
+  status event_status [not null, default: 'DRAFT']
+
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    organizer_id
+    category_id
+    slug
+    status
+    listing_type
+    city
+    start_time
+    (status, start_time)
+    (status, listing_type, start_time)
+    (category_id, status)
+    (organizer_id, status)
+  }
+
+  Note: '''
+  Sự kiện do ORGANIZER tạo.
+
+  DRAFT:
+  - Đang soạn
+  - Customer chưa thấy
+
+  PUBLISHED:
+  - Hiển thị trên Home/Events
+  - Cho phép đặt vé nếu đang trong thời gian mở bán
+
+  CANCELLED:
+  - Không cho đặt vé
+
+  FINISHED:
+  - Sự kiện đã kết thúc
+  '''
+}
+
+/* =========================
+   EVENT SEAT MAP
+========================= */
+
+Table event_sections {
+  id uuid [pk]
+
+  event_id uuid [not null]
+
+  name varchar(100) [not null]
+  base_price decimal(12,2) [not null]
+
+  row_count int [not null]
+  seats_per_row int [not null]
+
+  display_order int [not null, default: 0]
+
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    event_id
+    (event_id, name) [unique]
+    display_order
+  }
+
+  Note: '''
+  Khu ghế của từng event.
+
+  Ví dụ:
+  - VIP: 5 hàng x 10 ghế, giá 1.000.000
+  - A: 10 hàng x 15 ghế, giá 500.000
+  - B: 10 hàng x 20 ghế, giá 300.000
+
+  Khi tạo event, backend dùng row_count và seats_per_row để generate event_seats.
+  '''
+}
+
+Table event_seats {
+  id uuid [pk]
+
+  event_id uuid [not null]
+  section_id uuid [not null]
+
+  row_label varchar(10) [not null]
+  seat_number int [not null]
+  seat_code varchar(40) [not null]
+
+  price decimal(12,2) [not null]
+
+  status seat_status [not null, default: 'AVAILABLE']
+
+  locked_by uuid
+  lock_expires_at timestamptz
+
+  version int [not null, default: 0]
+
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    event_id
+    section_id
+    status
+    locked_by
+    lock_expires_at
+    (event_id, seat_code) [unique]
+    (event_id, section_id, row_label, seat_number) [unique]
+    (event_id, status)
+    (event_id, section_id, status)
+  }
+
+  Note: '''
+  Bảng quan trọng nhất của hệ thống booking.
+
+  Vòng đời ghế:
+  AVAILABLE -> LOCKED -> SOLD
+  AVAILABLE -> LOCKED -> AVAILABLE nếu quá hạn giữ chỗ
+
+  Khi user giữ ghế:
+  - Backend phải chạy transaction.
+  - Lock dòng event_seats bằng SELECT FOR UPDATE hoặc UPDATE atomic.
+  - Chỉ cho giữ nếu status = AVAILABLE hoặc LOCKED đã hết hạn.
+
+  lock_expires_at:
+  - Thường = now + 10 phút.
+  - Scheduler sẽ release ghế quá hạn về AVAILABLE.
+
+  version:
+  - Dùng nếu muốn hỗ trợ optimistic locking.
+  '''
+}
+
+/* =========================
+   ORDER + TICKET
+========================= */
+
+Table orders {
+  id uuid [pk]
+
+  user_id uuid [not null]
+  event_id uuid [not null]
+
+  status order_status [not null, default: 'PENDING']
+
+  subtotal decimal(12,2) [not null, default: 0]
+  discount_amount decimal(12,2) [not null, default: 0]
+  total_amount decimal(12,2) [not null, default: 0]
+
+  voucher_id uuid
+
+  expires_at timestamptz [not null]
+  created_at timestamptz [not null]
+  paid_at timestamptz
+  cancelled_at timestamptz
+
+  indexes {
+    user_id
+    event_id
+    status
+    expires_at
+    voucher_id
+    (user_id, status)
+    (event_id, status)
+  }
+
+  Note: '''
+  Khi user giữ ghế thành công, tạo order PENDING.
+
+  PENDING:
+  - Ghế đang được giữ
+  - User có 10 phút để xác nhận checkout
+
+  PAID:
+  - Checkout giả lập thành công
+  - Ghế chuyển SOLD
+  - order_items sinh qr_code
+
+  EXPIRED:
+  - Quá hạn thanh toán
+  - Ghế được release về AVAILABLE
+
+  CANCELLED:
+  - User hủy hoặc hệ thống hủy
+  '''
+}
+
+Table order_items {
+  id uuid [pk]
+
+  order_id uuid [not null]
+  event_seat_id uuid [not null]
+
+  price_snapshot decimal(12,2) [not null]
+
+  qr_code varchar(255) [unique]
+  ticket_status ticket_status [not null, default: 'NOT_ISSUED']
+
+  issued_at timestamptz
+  checked_in_at timestamptz
+
+  indexes {
+    order_id
+    event_seat_id
+    ticket_status
+    qr_code
+    (order_id, event_seat_id) [unique]
+  }
+
+  Note: '''
+  Gộp vé vào order_items để giảm số bảng.
+
+  Khi order còn PENDING:
+  - ticket_status = NOT_ISSUED
+  - qr_code = null
+
+  Khi order PAID:
+  - ticket_status = VALID
+  - qr_code được sinh ra
+
+  Khi check-in:
+  - ticket_status = USED
+  - checked_in_at có giá trị
+
+  Không đặt unique riêng trên event_seat_id để cho phép một ghế từng bị giữ trong order cũ đã EXPIRED,
+  sau đó được user khác giữ lại trong order mới.
+  Chống bán trùng dựa vào event_seats.status và transaction khi checkout.
+  '''
+}
+
+/* =========================
+   MEMBERSHIP
+========================= */
+
+Table membership_plans {
+  id bigint [pk]
+
+  name varchar(100) [not null, unique]
+  description text
+
+  price decimal(12,2) [not null, default: 0]
+  duration_days int [not null]
+  discount_percent decimal(5,2) [not null, default: 0]
+
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+
+  indexes {
+    is_active
+  }
+
+  Note: '''
+  Gói membership.
+  Ví dụ: Silver, Gold, Premium.
+
+  User có membership còn hạn có thể:
+  - Dùng voucher yêu cầu membership.
+  - Hoặc được giảm giá theo discount_percent nếu nhóm muốn áp dụng trực tiếp.
+  '''
+}
+
+Table user_memberships {
+  id uuid [pk]
+
+  user_id uuid [not null]
+  plan_id bigint [not null]
+
+  start_at timestamptz [not null]
+  end_at timestamptz [not null]
+
+  status membership_status [not null, default: 'ACTIVE']
+  created_at timestamptz [not null]
+
+  indexes {
+    user_id
+    plan_id
+    status
+    end_at
+    (user_id, status)
+  }
+
+  Note: '''
+  Lưu membership hiện tại và lịch sử đăng ký membership của user.
+
+  Với MVP, backend kiểm tra:
+  - status = ACTIVE
+  - start_at <= now
+  - end_at >= now
+
+  Nếu muốn đảm bảo mỗi user chỉ có một membership ACTIVE tại một thời điểm,
+  có thể thêm partial unique index trong migration SQL.
+  '''
+}
+
+/* =========================
+   VOUCHER
+========================= */
+
+Table vouchers {
+  id uuid [pk]
+
+  code varchar(50) [not null, unique]
+  description text
+
+  discount_type discount_type [not null]
+  discount_value decimal(12,2) [not null]
+
+  max_discount decimal(12,2)
+  min_order_amount decimal(12,2) [not null, default: 0]
+
+  membership_required boolean [not null, default: false]
+
+  start_at timestamptz [not null]
+  end_at timestamptz [not null]
+
+  usage_limit int
+  used_count int [not null, default: 0]
+
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+
+  indexes {
+    code
+    is_active
+    start_at
+    end_at
+    membership_required
+  }
+
+  Note: '''
+  Voucher giảm giá.
+
+  discount_type:
+  - PERCENT: giảm theo %
+  - FIXED: giảm số tiền cố định
+
+  membership_required = true:
+  - Chỉ user có membership ACTIVE còn hạn mới dùng được.
+
+  usage_limit:
+  - Giới hạn tổng số lượt dùng voucher.
+
+  used_count:
+  - Tăng khi order PAID thành công.
+  '''
+}
+
+Table voucher_redemptions {
+  id uuid [pk]
+
+  voucher_id uuid [not null]
+  user_id uuid [not null]
+  order_id uuid [not null]
+
+  discount_amount decimal(12,2) [not null]
+  used_at timestamptz [not null]
+
+  indexes {
+    voucher_id
+    user_id
+    order_id
+    (voucher_id, user_id) [unique]
+    (voucher_id, order_id) [unique]
+  }
+
+  Note: '''
+  Lưu lịch sử sử dụng voucher.
+
+  Bảng này giúp:
+  - Chặn một user dùng cùng một voucher nhiều lần.
+  - Thống kê voucher đã được dùng bởi ai.
+  - Tránh chỉ dựa vào used_count trong vouchers.
+
+  Nếu nhóm muốn một user được dùng cùng voucher nhiều lần,
+  bỏ unique (voucher_id, user_id) trong migration SQL.
+  '''
+}
+
+/* =========================
+   RELATIONSHIPS
+========================= */
+
+Ref: events.organizer_id > users.id
+Ref: events.category_id > categories.id
+
+Ref: event_sections.event_id > events.id
+
+Ref: event_seats.event_id > events.id
+Ref: event_seats.section_id > event_sections.id
+Ref: event_seats.locked_by > users.id
+
+Ref: orders.user_id > users.id
+Ref: orders.event_id > events.id
+Ref: orders.voucher_id > vouchers.id
+
+Ref: order_items.order_id > orders.id
+Ref: order_items.event_seat_id > event_seats.id
+
+Ref: user_memberships.user_id > users.id
+Ref: user_memberships.plan_id > membership_plans.id
+
+Ref: voucher_redemptions.voucher_id > vouchers.id
+Ref: voucher_redemptions.user_id > users.id
+Ref: voucher_redemptions.order_id > orders.id
+
+/* =========================
+   TABLE GROUPS
+========================= */
+
+TableGroup "User & Membership" {
+  users
+  membership_plans
+  user_memberships
+}
+
+TableGroup "Event & Seat Map" {
+  categories
+  events
+  event_sections
+  event_seats
+}
+
+TableGroup "Booking & Ticket" {
+  orders
+  order_items
+}
+
+TableGroup "Voucher" {
+  vouchers
+  voucher_redemptions
+}

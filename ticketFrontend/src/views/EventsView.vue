@@ -1,87 +1,152 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-import EventCard from '../components/EventCard.vue'; // 1. Import Component vào đây
+import { computed, onMounted, ref } from "vue";
+import { getEvents } from "../api/ticketRushApi";
+import EventCard from "../components/EventCard.vue";
 
-// 1. Mock Data (Giả lập dữ liệu trả về từ Backend API)
-const categories = ref([
+const eventsPage = ref(null);
+const eventsList = ref([]);
+const loading = ref(true);
+const error = ref("");
+const selectedTab = ref("NOW_SHOWING");
+
+const tabDefinitions = [
   {
-    id: 1,
-    name: "Music & Concerts",
-    description: "Experience the best live performances and music festivals.",
-    events: [
-      { id: 101, title: "Rock the Night 2024", date: "Dec 15, 2024", location: "Hanoi Opera House", price: "450,000 VND", tag: "Hot", image: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=500&q=80" },
-      { id: 102, title: "Jazz & Wine Evening", date: "Jan 10, 2025", location: "Saigon Rooftop", price: "1,200,000 VND", tag: "Exclusive", image: "https://images.unsplash.com/photo-1514525253344-a8130a2185d0?auto=format&fit=crop&w=500&q=80" },
-      { id: 103, title: "Underground EDM Rave", date: "Dec 30, 2024", location: "Warehouse District", price: "300,000 VND", tag: "New", image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=500&q=80" },
-    ]
+    id: "NOW_SHOWING",
+    label: "Now Showing",
+    title: "Now Showing",
+    description: "Current releases playing in cinemas.",
   },
   {
-    id: 2,
-    name: "Sports & Fitness",
-    description: "Join the most exciting matches and athletic challenges.",
-    events: [
-      { id: 201, title: "City Half-Marathon", date: "Feb 20, 2025", location: "Hoan Kiem Lake", price: "500,000 VND", tag: "Early Bird", image: "https://images.unsplash.com/photo-1533560904424-a0c61dc306fc?auto=format&fit=crop&w=500&q=80" },
-      { id: 202, title: "Basketball All-Stars", date: "Mar 05, 2025", location: "Military Zone 7 Stadium", price: "250,000 VND", tag: "Selling Fast", image: "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=500&q=80" },
-    ]
+    id: "UPCOMING",
+    label: "Upcoming",
+    title: "Upcoming",
+    description: "Premieres and coming soon.",
   },
   {
-    id: 3,
-    name: "Workshops & Seminars",
-    description: "Learn new skills and network with industry experts.",
-    events: [
-      { id: 301, title: "UI/UX Design Masterclass", date: "Dec 22, 2024", location: "Tech Hub Center", price: "2,000,000 VND", tag: "Limited Space", image: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=500&q=80" },
-      { id: 302, title: "Digital Marketing 101", date: "Jan 15, 2025", location: "Online (Zoom)", price: "FREE", tag: "Open", image: "https://images.unsplash.com/photo-1432888622747-4eb9a8f2c20e?auto=format&fit=crop&w=500&q=80" },
-    ]
+    id: "SPECIAL",
+    label: "Special Showtimes",
+    title: "Special Showtimes",
+    description: "Limited or special event screenings.",
+  },
+];
+
+async function loadEvents() {
+  loading.value = true;
+  error.value = "";
+
+  try {
+    eventsPage.value = await getEvents({ size: 50 });
+    eventsList.value = eventsPage.value?.content || [];
+  } catch (err) {
+    error.value = "Could not load movies. Please check the backend API.";
+  } finally {
+    loading.value = false;
   }
-]);
+}
 
-// Sau này bạn sẽ dùng hàm này để gọi API thật
-// onMounted(async () => {
-//   const response = await fetch('your-backend-api/categories');
-//   categories.value = await response.json();
-// });
+function normalizeListingType(event) {
+  const explicitType = event.listingType || event.movieType || event.movieStatus;
+  const normalized = String(explicitType || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+
+  if (["NOW_SHOWING", "UPCOMING", "SPECIAL"].includes(normalized)) {
+    return normalized;
+  }
+
+  const tag = String(event.tag || "").toLowerCase();
+  if (["special", "vip", "limited"].some((item) => tag.includes(item))) {
+    return "SPECIAL";
+  }
+  if (["coming soon", "coming", "preview", "soon"].some((item) => tag.includes(item))) {
+    return "UPCOMING";
+  }
+  return "NOW_SHOWING";
+}
+
+const groupedEvents = computed(() =>
+  tabDefinitions.map((tab) => ({
+    ...tab,
+    events: eventsList.value.filter((event) => normalizeListingType(event) === tab.id),
+  })),
+);
+
+const activeGroup = computed(
+  () => groupedEvents.value.find((group) => group.id === selectedTab.value) || groupedEvents.value[0],
+);
+
+onMounted(loadEvents);
 </script>
 
 <template>
   <div class="bg-brand-light dark:bg-slate-900 min-h-screen pb-20">
     <div class="bg-brand-navy py-16 px-4 text-center text-white mb-12 shadow-inner">
       <h1 class="text-4xl md:text-5xl text-brand-orange mb-4 uppercase tracking-tighter font-black">
-        Discover Events
+        Now Showing
       </h1>
       <p class="text-blue-100 max-w-2xl mx-auto text-lg">
-        Explore a wide range of categories and find the perfect event for you.
+        Browse movie genres, compare showtimes, and pick your next cinema night.
       </p>
     </div>
 
     <div class="max-w-7xl mx-auto px-4 md:px-8">
-      
-      <section v-for="category in categories" :key="category.id" class="mb-20">
-        
-        <div class="mb-8 border-b border-gray-200 dark:border-slate-800 pb-4">
-          <div class="flex items-center gap-3 mb-2">
-            <h2 class="text-3xl font-black text-brand-navy dark:text-white uppercase tracking-tight">
-              {{ category.name }}
-            </h2>
-            <span class="bg-brand-orange/10 text-brand-orange text-sm font-bold px-3 py-1 rounded-full border border-brand-orange/20">
-              {{ category.events.length }} Events
-            </span>
+      <div class="bg-white dark:bg-slate-800 rounded-3xl p-3 mb-8 flex flex-wrap gap-3 items-center justify-center">
+        <button
+          v-for="group in groupedEvents"
+          :key="group.id"
+          :class="[
+            'px-5 py-2 rounded-full font-bold uppercase tracking-wide text-sm transition',
+            selectedTab === group.id
+              ? 'bg-brand-navy text-white'
+              : 'bg-white text-brand-navy border border-gray-200 dark:bg-slate-900 dark:text-white dark:border-slate-700',
+          ]"
+          @click="selectedTab = group.id"
+        >
+          {{ group.label }} ({{ group.events.length }})
+        </button>
+      </div>
+
+      <div
+        v-if="loading"
+        class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
+      >
+        Loading movies...
+      </div>
+
+      <div
+        v-else-if="error"
+        class="bg-red-50 border border-red-100 text-red-700 rounded-3xl p-8 text-center font-bold"
+      >
+        {{ error }}
+      </div>
+
+      <div
+        v-else-if="eventsList.length === 0"
+        class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
+      >
+        No published movies are available yet.
+      </div>
+
+      <template v-else>
+        <section v-if="activeGroup.events.length" class="mb-16">
+          <div class="mb-6 flex items-center justify-between">
+            <div>
+              <h2 class="text-3xl font-black text-brand-navy dark:text-white tracking-tight">{{ activeGroup.title }}</h2>
+              <p class="text-gray-500 dark:text-gray-400">{{ activeGroup.description }}</p>
+            </div>
+            <div class="text-sm text-gray-600 dark:text-slate-300 font-bold">{{ activeGroup.events.length }} Movies</div>
           </div>
-          <p class="text-gray-500 dark:text-gray-400 italic">{{ category.description }}</p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <EventCard v-for="event in activeGroup.events" :key="event.id" :event="event" />
+          </div>
+        </section>
+
+        <div
+          v-else
+          class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
+        >
+          No movies in this section yet.
         </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          <EventCard 
-            v-for="event in category.events" 
-            :key="event.id" 
-            :event="event" 
-          />
-        </div>
-
-      </section>
-
+      </template>
     </div>
   </div>
 </template>
-
-<style scoped>
-/* Bạn có thể thêm các hiệu ứng riêng cho trang này ở đây */
-</style>

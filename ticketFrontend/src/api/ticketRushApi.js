@@ -1,0 +1,85 @@
+import apiClient from "./client";
+
+export async function getHome() {
+  const { data } = await apiClient.get("/api/home");
+  return data;
+}
+
+export async function getGroupedEvents(limitPerCategory = 4) {
+  const { data } = await apiClient.get("/api/events/grouped", {
+    params: { limitPerCategory },
+  });
+  return data;
+}
+
+export async function getEvents(params = {}) {
+  const { data } = await apiClient.get("/api/events", { params });
+  return data;
+}
+
+export async function getBookingEvent(eventId) {
+  const { data } = await apiClient.get(`/api/events/${eventId}/booking`);
+  return data;
+}
+
+export async function getMembershipPlans() {
+  const { data } = await apiClient.get("/api/membership/plans");
+  return data;
+}
+
+export async function getCurrentMembership() {
+  const { data } = await apiClient.get("/api/me/membership");
+  return data;
+}
+
+export async function subscribeMembership(planId) {
+  const { data } = await apiClient.post("/api/me/membership/subscribe", { planId });
+  return data;
+}
+
+export async function cancelMembership() {
+  const { data } = await apiClient.patch("/api/me/membership/cancel");
+  return data;
+}
+
+export async function getProfile() {
+  const { data } = await apiClient.get("/api/me");
+  return data;
+}
+
+export async function getProfileDashboard() {
+  const { data } = await apiClient.get("/api/me/dashboard");
+  return data;
+}
+
+export async function getMyTickets(params = {}) {
+  const { data } = await apiClient.get("/api/me/tickets", { params });
+  return data;
+}
+
+export async function getTicketDetail(orderId) {
+  const { data } = await apiClient.get(`/api/me/tickets/${orderId}`);
+  return data;
+}
+
+export async function previewCheckout(payload) {
+  const { data } = await apiClient.post("/api/me/checkout/preview", payload);
+  return data;
+}
+
+export async function confirmCheckout(payload) {
+  const { data } = await apiClient.post("/api/me/checkout/confirm", payload);
+  return data;
+}
+
+export async function completePayOSCheckout(orderCode) {
+  const { data } = await apiClient.post("/api/me/checkout/payos/complete", null, {
+    params: { orderCode },
+  });
+  return data;
+}
+
+export async function updateProfile(payload) {
+  const { data } = await apiClient.put("/api/me", payload);
+  return data;
+}
