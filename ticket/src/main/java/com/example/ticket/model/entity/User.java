@@ -87,6 +87,15 @@ public class User {
     @Column(name = "provider_requested_at")
     private Instant providerRequestedAt;
 
+    @Column(name = "provider_reviewed_at")
+    private Instant providerReviewedAt;
+
+    @Column(name = "provider_reviewed_by")
+    private UUID providerReviewedBy;
+
+    @Column(name = "provider_rejection_reason")
+    private String providerRejectionReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

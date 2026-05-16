@@ -55,8 +55,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         enforceRateLimit("auth:reset-rate:ip:" + clientIp, IP_RATE_LIMIT, IP_RATE_WINDOW);
 
         userRepository.findByEmailIgnoreCase(normalizedEmail)
-                .filter(user -> user.getProvider() == AuthProvider.LOCAL && user.getPasswordHash() != null)
-                .ifPresent(this::createTokenAndSendEmail);
+            .ifPresent(this::createTokenAndSendEmail);
     }
 
     @Override

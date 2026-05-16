@@ -33,7 +33,11 @@ public class AccountVerificationService {
     }
 
     public void sendVerificationEmail(User user) {
-        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+        sendVerificationEmail(user, false);
+    }
+
+    public void sendVerificationEmail(User user, boolean force) {
+        if (!force && Boolean.TRUE.equals(user.getEmailVerified())) {
             return;
         }
         String token = tokenService.createToken(TOKEN_KEY_PREFIX, user.getId().toString(), TOKEN_TTL);

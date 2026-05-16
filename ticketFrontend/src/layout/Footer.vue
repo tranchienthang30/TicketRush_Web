@@ -9,7 +9,7 @@
         </p>
       </div>
       <div>
-        <h4 class="font-bold mb-4 uppercase tracking-wider">Liên hệ</h4>
+        <h4 class="font-bold mb-4 uppercase tracking-wider">Contact</h4>
         <ul class="space-y-2 text-sm text-gray-300">
           <li>Address: 144 Xuan Thuy, Cau Giay, Ha Noi</li>
           <li>Phone: +(84)6868686868</li>

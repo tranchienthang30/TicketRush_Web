@@ -26,7 +26,9 @@ public class ProfileQueryRepository {
     public Optional<ProfileResponse> findProfile(UUID userId) {
         String sql = """
                 SELECT id, email, full_name, avatar_url, phone, gender, date_of_birth,
-                       role::text AS role, status::text AS status, created_at, updated_at
+                       role::text AS role, status::text AS status, email_verified,
+                       provider_request_status, provider_requested_at, provider_reviewed_at,
+                       provider_rejection_reason, created_at, updated_at
                 FROM users
                 WHERE id = :userId
                 """;
@@ -257,6 +259,11 @@ public class ProfileQueryRepository {
                 rs.getObject("date_of_birth", LocalDate.class),
                 rs.getString("role"),
                 rs.getString("status"),
+                rs.getBoolean("email_verified"),
+                rs.getString("provider_request_status"),
+                rs.getObject("provider_requested_at", OffsetDateTime.class),
+                rs.getObject("provider_reviewed_at", OffsetDateTime.class),
+                rs.getString("provider_rejection_reason"),
                 rs.getObject("created_at", OffsetDateTime.class),
                 rs.getObject("updated_at", OffsetDateTime.class)
         );

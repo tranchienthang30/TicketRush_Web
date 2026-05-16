@@ -13,6 +13,7 @@ const showProfileMenu = ref(false);
 
 const isLoggedIn = computed(() => authStore.isAuthenticated);
 const currentUser = computed(() => authStore.user);
+const currentRole = computed(() => currentUser.value?.role || "GUEST");
 const displayName = computed(() => currentUser.value?.fullName || currentUser.value?.email || "User");
 const initials = computed(() => {
   const source = displayName.value.trim();
@@ -24,25 +25,41 @@ const initials = computed(() => {
     .join("")
     .toUpperCase();
 });
-const canManageMovies = computed(() => ["PROVIDER", "ADMIN"].includes(currentUser.value?.role));
+const isProvider = computed(() => currentRole.value === "PROVIDER");
+const isAdmin = computed(() => currentRole.value === "ADMIN");
+const homePath = computed(() => {
+  if (isAdmin.value) return "/admin/dashboard";
+  if (isProvider.value) return "/provider/home";
+  return "/";
+});
 
-const navItems = computed(() => [
-  { name: "Home", path: "/" },
-  { name: "Movies", path: "/events" },
-  canManageMovies.value
-    ? { name: "Managements", path: "/cinemas-management", auth: true, providerOnly: true }
-    : { name: "Booking", path: "/booking" },
-  { name: "Creating", path: "/create-movie", auth: true, providerOnly: true },
-  { name: "Help Center", path: "/help" },
-]);
+const visibleNavItems = computed(() => {
+  if (isAdmin.value) {
+    return [
+      { name: "Dashboard", path: "/admin/dashboard" },
+      { name: "User", path: "/admin/users" },
+      { name: "System", path: "/admin/system" },
+      { name: "Provider Requests", path: "/admin/provider-requests" },
+      { name: "Help Center", path: "/help" },
+    ];
+  }
 
-const visibleNavItems = computed(() =>
-  navItems.value.filter((item) => {
-    if (item.providerOnly) return canManageMovies.value;
-    if (item.auth) return isLoggedIn.value;
-    return true;
-  }),
-);
+  if (isProvider.value) {
+    return [
+      { name: "Home", path: "/provider/home" },
+      { name: "Creating", path: "/create-movie" },
+      { name: "Managements", path: "/cinemas-management" },
+      { name: "Help Center", path: "/help" },
+    ];
+  }
+
+  return [
+    { name: "Home", path: "/" },
+    { name: "Events", path: "/events" },
+    { name: "Booking", path: "/booking" },
+    { name: "Help Center", path: "/help" },
+  ];
+});
 
 function closeMenu(event) {
   if (!event.target.closest(".profile-dropdown-container")) {
@@ -71,7 +88,7 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
   <header class="sticky top-0 z-50 shadow-md overflow-visible">
     <div class="relative z-40 bg-brand-navy text-white py-3.5 px-4 md:px-8 flex items-center justify-between">
       <router-link
-        to="/"
+        :to="homePath"
         class="text-2xl md:text-3xl font-black tracking-tighter hover:opacity-90 transition-all flex-shrink-0"
       >
         STAR<span class="text-brand-orange">LIGHT</span>
@@ -87,7 +104,7 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
 
       <div class="flex items-center gap-4 lg:gap-6">
         <router-link
-          v-if="isLoggedIn && !canManageMovies"
+          v-if="isLoggedIn && currentRole === 'CUSTOMER'"
           to="/my-tickets"
           class="hidden sm:flex items-center gap-2 hover:text-brand-orange transition text-base md:text-lg font-bold whitespace-nowrap"
         >
@@ -150,7 +167,7 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
             </router-link>
 
             <router-link
-              v-if="!canManageMovies"
+              v-if="currentRole === 'CUSTOMER'"
               to="/my-tickets"
               class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
               @click="showProfileMenu = false"
@@ -159,7 +176,52 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
             </router-link>
 
             <router-link
-              v-if="canManageMovies"
+              v-if="isAdmin"
+              to="/admin/dashboard"
+              class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
+              @click="showProfileMenu = false"
+            >
+              Admin Dashboard
+            </router-link>
+
+            <router-link
+              v-if="isAdmin"
+              to="/admin/users"
+              class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
+              @click="showProfileMenu = false"
+            >
+              User Management
+            </router-link>
+
+            <router-link
+              v-if="isAdmin"
+              to="/admin/system"
+              class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
+              @click="showProfileMenu = false"
+            >
+              System Status
+            </router-link>
+
+            <router-link
+              v-if="isAdmin"
+              to="/admin/provider-requests"
+              class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
+              @click="showProfileMenu = false"
+            >
+              Provider Requests
+            </router-link>
+
+            <router-link
+              v-if="isProvider"
+              to="/provider/home"
+              class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
+              @click="showProfileMenu = false"
+            >
+              Provider Home
+            </router-link>
+
+            <router-link
+              v-if="isProvider"
               to="/create-movie"
               class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
               @click="showProfileMenu = false"
@@ -168,12 +230,12 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
             </router-link>
 
             <router-link
-              v-if="canManageMovies"
+              v-if="isProvider"
               to="/cinemas-management"
               class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
               @click="showProfileMenu = false"
             >
-              Cinemas Management
+              Events Management
             </router-link>
 
             <div class="border-t border-gray-100 dark:border-slate-700">

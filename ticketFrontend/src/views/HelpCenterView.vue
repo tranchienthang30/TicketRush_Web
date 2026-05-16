@@ -9,9 +9,9 @@ const helpCategories = ref([
     articles: [
       {
         id: "m1",
-        title: "How to find a movie?",
+        title: "How to find a events?",
         content:
-          '<p class="mb-4">Open the <strong>Movies</strong> page from the top menu to browse films by genre. You can also use the search bar to look for a title, cinema, or city.</p><p>Movie data is refreshed from the backend API.</p>',
+          '<p class="mb-4">Open the <strong>Events</strong> page from the top menu to browse films by genre. You can also use the search bar to look for a title, cinema, or city.</p><p>Movie data is refreshed from the backend API.</p>',
       },
       {
         id: "m2",

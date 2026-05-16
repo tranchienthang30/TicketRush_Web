@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter, RouterLink } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
 import * as eventApi from "@/api/event.api";
-import * as organizationApi from "@/api/organization.api";
+import * as providerApi from "@/api/provider.api";
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -13,11 +13,6 @@ const categories = ref([]);
 const loading = ref(false);
 const error = ref("");
 const message = ref("");
-
-const providerForm = reactive({
-  name: "",
-  businessEmail: "",
-});
 
 const form = reactive({
   title: "",
@@ -45,8 +40,10 @@ const form = reactive({
 });
 
 const isProviderReady = computed(() =>
-  ["PROVIDER", "ADMIN"].includes(authStore.user?.role) && authStore.user?.primaryOrganizationId
+  ["PROVIDER", "ADMIN"].includes(authStore.user?.role)
 );
+
+const providerRequestStatus = computed(() => authStore.user?.providerRequestStatus || null);
 
 onMounted(async () => {
   const response = await eventApi.getCategories();
@@ -56,20 +53,14 @@ onMounted(async () => {
 async function requestProviderVerification() {
   error.value = "";
   message.value = "";
-  if (!providerForm.name || !providerForm.businessEmail) {
-    error.value = "Please enter provider name and business email.";
-    return;
-  }
 
   loading.value = true;
   try {
-    const response = await organizationApi.registerOrganization({
-      name: providerForm.name,
-      businessEmail: providerForm.businessEmail,
-    });
-    message.value = response.data.message || "Verification email has been sent.";
+    const response = await providerApi.requestProviderAccess();
+    authStore.setUser(response.data.data);
+    message.value = response.data.message || "Provider request has been submitted.";
   } catch (err) {
-    error.value = err.response?.data?.message || "Unable to request provider verification.";
+    error.value = err.response?.data?.message || "Unable to request provider access.";
   } finally {
     loading.value = false;
   }
@@ -186,27 +177,33 @@ function toInstant(value) {
   <section class="min-h-screen bg-brand-light dark:bg-slate-900 px-4 py-8">
     <div class="max-w-7xl mx-auto">
       <div v-if="!isProviderReady" class="max-w-2xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8">
-        <h1 class="text-3xl font-black text-brand-navy dark:text-white mb-3">Verify your provider profile</h1>
+        <h1 class="text-3xl font-black text-brand-navy dark:text-white mb-3">Provider approval required</h1>
         <p class="text-slate-500 dark:text-slate-400 mb-6">
-          To create movies and showtimes, verify a business email. After verification, your account becomes a provider.
+          To create events, request provider access and wait for admin approval. TicketRush will send an email verification link again when you submit the request.
         </p>
 
         <form class="space-y-5" @submit.prevent="requestProviderVerification">
-          <label class="block">
-            <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Provider name</span>
-            <input v-model.trim="providerForm.name" type="text" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30" />
-          </label>
-          <label class="block">
-            <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Business email</span>
-            <input v-model.trim="providerForm.businessEmail" type="email" placeholder="movies@company.com" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-brand-orange/30" />
-          </label>
+          <p
+            v-if="providerRequestStatus === 'PENDING'"
+            class="text-sm text-orange-700 bg-orange-50 border border-orange-100 rounded-xl px-4 py-3"
+          >
+            Waiting for admin's approval. You can continue booking tickets as a customer.
+          </p>
 
           <p v-if="message" class="text-sm text-green-700 bg-green-50 border border-green-100 rounded-xl px-4 py-3">{{ message }}</p>
           <p v-if="error" class="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">{{ error }}</p>
 
-          <button type="submit" :disabled="loading" class="w-full bg-brand-orange hover:bg-orange-600 disabled:opacity-60 text-white font-black py-3 rounded-xl transition">
-            {{ loading ? "Sending..." : "Send verification email" }}
+          <button
+            v-if="providerRequestStatus !== 'PENDING'"
+            type="submit"
+            :disabled="loading"
+            class="w-full bg-brand-orange hover:bg-orange-600 disabled:opacity-60 text-white font-black py-3 rounded-xl transition"
+          >
+            {{ loading ? "Submitting..." : "Becoming Providers" }}
           </button>
+          <RouterLink to="/profile" class="block text-center text-sm font-black text-brand-orange hover:underline">
+            Go to profile
+          </RouterLink>
         </form>
       </div>
 
@@ -231,10 +228,10 @@ function toInstant(value) {
           <div class="mb-6 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-5">
             <h1 class="text-2xl font-black text-brand-navy dark:text-white mb-2">Provider rules</h1>
             <ul class="text-sm text-slate-600 dark:text-slate-300 space-y-1 list-disc pl-5">
-              <li>Use accurate movie/showtime information, official images, venue, and sale period.</li>
+              <li>Use accurate event information, official images, venue, and sale period.</li>
               <li>Ticket sections and seat labels must match the actual venue setup.</li>
-              <li>Payout information must belong to the verified provider profile.</li>
-              <li>This MVP publishes movies immediately; admin review will replace this later.</li>
+              <li>Payout information must belong to the approved provider account.</li>
+              <li>This MVP publishes events immediately; admin review for event content can be added later.</li>
             </ul>
           </div>
 
