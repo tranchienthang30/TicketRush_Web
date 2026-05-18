@@ -102,10 +102,55 @@ function closeTicketDetail() {
 }
 
 const detailTickets = computed(() => selectedTicketDetail.value?.tickets || []);
+const qrBaseUrl = computed(() => resolveQrBaseUrl());
 
-function qrImageUrl(content) {
-  if (!content) return "";
-  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(content)}`;
+function toBase64Url(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function buildQrPayload(item) {
+  return {
+    version: 1,
+    type: "TICKET_RUSH_TICKET",
+    generatedAt: new Date().toISOString(),
+    orderId: selectedTicketDetail.value?.orderId || selectedTicket.value?.orderId || null,
+    eventId: selectedTicketDetail.value?.eventId || selectedTicket.value?.eventId || null,
+    eventSlug: selectedTicketDetail.value?.eventSlug || selectedTicket.value?.eventSlug || null,
+    eventTitle: selectedTicketDetail.value?.title || selectedTicket.value?.title || null,
+    eventTime: selectedTicketDetail.value?.startTime || selectedTicket.value?.startTime || null,
+    venue: selectedTicketDetail.value?.location || selectedTicket.value?.location || null,
+    seatCode: item.seatCode || null,
+    ticketStatus: item.ticketStatus || null,
+    qrCode: item.qrCode || null,
+  };
+}
+
+function qrScanUrl(item) {
+  if (!qrBaseUrl.value) return "";
+  const payload = buildQrPayload(item);
+  const token = toBase64Url(JSON.stringify(payload));
+  return `${qrBaseUrl.value}/ticket-qr?payload=${encodeURIComponent(token)}`;
+}
+
+function qrImageUrl(item) {
+  const url = qrScanUrl(item);
+  if (!url) return "";
+  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(url)}`;
+}
+
+function resolveQrBaseUrl() {
+  const configured = String(import.meta.env.VITE_QR_PUBLIC_BASE_URL || "").trim();
+  if (configured) {
+    return configured.replace(/\/+$/, "");
+  }
+
+  if (typeof window === "undefined") return "";
+  return window.location.origin.replace(/\/+$/, "");
 }
 
 watch(selectedStatus, loadTickets);
@@ -280,7 +325,7 @@ onUnmounted(() => {
               class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"
             >
               <img
-                :src="qrImageUrl(item.qrContent || item.qrCode)"
+                :src="qrImageUrl(item)"
                 alt="Ticket QR"
                 class="mx-auto h-44 w-44 rounded-xl border border-slate-200 bg-white p-2"
               />
@@ -288,6 +333,7 @@ onUnmounted(() => {
                 <p>Seat: <span class="font-bold text-slate-800 dark:text-white">{{ item.seatCode }}</span></p>
                 <p>Ticket status: <span class="font-bold text-slate-800 dark:text-white">{{ item.ticketStatus }}</span></p>
                 <p>QR code: <span class="font-bold text-slate-800 dark:text-white">{{ item.qrCode || "N/A" }}</span></p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Scan QR to open and download ticket JSON.</p>
               </div>
             </article>
           </div>

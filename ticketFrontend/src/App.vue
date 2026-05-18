@@ -2,9 +2,6 @@
 import { ref, onMounted } from "vue";
 import Header from "./layout/Header.vue";
 import Footer from "./layout/Footer.vue";
-import { useAuthStore } from "./stores/authStore";
-
-const authStore = useAuthStore();
 
 const isDark = ref(false);
 
@@ -28,13 +25,6 @@ onMounted(() => {
 <template>
   <div class="min-h-screen flex flex-col bg-brand-light dark:bg-brand-dark transition-colors duration-300">
     <Header :isDark="isDark" @toggle-theme="toggleTheme" />
-
-    <div
-      v-if="authStore.sessionNotice"
-      class="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-3 text-sm font-semibold text-center"
-    >
-      {{ authStore.sessionNotice }}
-    </div>
 
     <main class="flex-grow">
       <router-view />

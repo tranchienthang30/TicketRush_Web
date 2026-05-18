@@ -12,6 +12,7 @@ const router = createRouter({
     { path: "/checkout", name: "checkout", component: () => import("@/views/CheckoutView.vue"), meta: { requiresAuth: true, requiresCustomer: true } },
     { path: "/checkout/success", name: "checkout-success", component: () => import("@/views/CheckoutSuccessView.vue") },
     { path: "/checkout/cancel", name: "checkout-cancel", component: () => import("@/views/CheckoutCancelView.vue") },
+    { path: "/ticket-qr", name: "ticket-qr-payload", component: () => import("@/views/TicketQrPayloadView.vue") },
     { path: "/my-tickets", name: "my-tickets", component: () => import("@/views/MyTicketsView.vue"), meta: { requiresAuth: true, requiresCustomer: true } },
     { path: "/profile", name: "profile", component: () => import("@/views/ProfileView.vue"), meta: { requiresAuth: true } },
     { path: "/account", redirect: "/profile" },

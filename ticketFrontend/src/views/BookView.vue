@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { getBookingEvent, getEvents } from "../api/ticketRushApi";
+import { getBookingEvent, getCategories, getEventBySlug } from "../api/ticketRushApi";
 
 const CHECKOUT_STORAGE_KEY = "ticketrush_checkout_payload";
 const SELECT_TIMEOUT_SECONDS = 10 * 60;
@@ -11,10 +11,16 @@ const router = useRouter();
 
 const loading = ref(true);
 const error = ref("");
+const needsEventSelection = ref(false);
 const bookingEvent = ref(null);
+const eventDetail = ref(null);
+const categories = ref([]);
 const selectedSeats = ref([]);
 const timerSeconds = ref(SELECT_TIMEOUT_SECONDS);
 let timerHandle = null;
+
+const fallbackImage =
+  "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1600&q=80";
 
 const visibleSeats = computed(() => {
   const sections = bookingEvent.value?.sections || [];
@@ -94,6 +100,42 @@ const selectedSeatCodes = computed(() => {
   return codes;
 });
 const totalPrice = computed(() => selectedSeats.value.reduce((sum, seat) => sum + Number(seat.price || 0), 0));
+const categoryName = computed(() => {
+  const categoryId = Number(eventDetail.value?.categoryId);
+  if (!Number.isFinite(categoryId) || categoryId <= 0) {
+    return "";
+  }
+  return categories.value.find((category) => Number(category.id) === categoryId)?.name || "";
+});
+
+const eventInformation = computed(() => {
+  const event = eventDetail.value;
+  if (!event) return [];
+
+  const minPrice = Number(event.minPrice);
+  return [
+    { label: "Category", value: categoryName.value },
+    { label: "Genre", value: event.genre },
+    { label: "Country", value: event.country },
+    { label: "Duration", value: formatDuration(event.durationMinutes) },
+    { label: "Start", value: formatDateTime(event.startTime) },
+    { label: "Sale window", value: formatSaleWindow(event.saleStartTime, event.saleEndTime) },
+    { label: "From price", value: Number.isFinite(minPrice) && minPrice > 0 ? formatMoney(minPrice) : "Free" },
+  ].filter((item) => item.value);
+});
+
+const creditsInformation = computed(() => {
+  const event = eventDetail.value;
+  if (!event) return [];
+
+  return [
+    { label: "Author / Creator", value: event.authorName },
+    { label: "Director", value: event.directorName },
+    { label: "Cast / Speakers", value: event.castMembers },
+    { label: "Performers", value: event.performerNames },
+    { label: "Singers", value: event.singerNames },
+  ].filter((item) => item.value);
+});
 
 const showtimeLabel = computed(() => {
   if (!bookingEvent.value?.startTime) return "";
@@ -130,6 +172,42 @@ function formatMoney(value) {
     style: "currency",
     currency: "VND",
   }).format(value || 0);
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function formatDuration(value) {
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return "";
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours > 0 && remainingMinutes > 0) {
+    return `${hours}h ${remainingMinutes}m`;
+  }
+  if (hours > 0) {
+    return `${hours}h`;
+  }
+  return `${remainingMinutes}m`;
+}
+
+function formatSaleWindow(start, end) {
+  if (!start && !end) return "";
+  if (start && end) {
+    return `${formatDateTime(start)} - ${formatDateTime(end)}`;
+  }
+  if (start) {
+    return `From ${formatDateTime(start)}`;
+  }
+  return `Until ${formatDateTime(end)}`;
 }
 
 function isSeatSelected(seatId) {
@@ -228,20 +306,29 @@ function startTimer() {
 async function loadBookingData() {
   loading.value = true;
   error.value = "";
+  needsEventSelection.value = false;
   selectedSeats.value = [];
+  eventDetail.value = null;
+  categories.value = [];
 
   try {
-    let eventId = route.query.eventId;
-    if (!eventId) {
-      const pageData = await getEvents({ page: 0, size: 1 });
-      eventId = pageData?.content?.[0]?.id;
-    }
+    const eventId = route.query.eventId;
 
     if (!eventId) {
-      throw new Error("No event found");
+      bookingEvent.value = null;
+      needsEventSelection.value = true;
+      return;
     }
 
     bookingEvent.value = await getBookingEvent(eventId);
+    if (bookingEvent.value?.slug) {
+      const [eventResponse, categoryResponse] = await Promise.all([
+        getEventBySlug(bookingEvent.value.slug).catch(() => null),
+        getCategories().catch(() => []),
+      ]);
+      eventDetail.value = eventResponse;
+      categories.value = categoryResponse;
+    }
     startTimer();
   } catch {
     bookingEvent.value = null;
@@ -297,68 +384,150 @@ onUnmounted(() => clearInterval(timerHandle));
         {{ error }}
       </div>
 
-      <template v-else>
-        <div class="rounded-[2rem] border border-slate-200 bg-white px-4 pb-8 pt-6 shadow-sm md:px-8">
-          <div class="mx-auto mb-10 max-w-5xl">
-            <div class="h-4 rounded-full bg-gradient-to-b from-amber-300 via-amber-200 to-transparent"></div>
-            <p class="mt-3 text-center text-xs font-black uppercase tracking-[0.3em] text-slate-500">Stage / Venue</p>
-          </div>
+      <div
+        v-else-if="needsEventSelection"
+        class="rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center"
+      >
+        <p class="text-lg font-black text-amber-800">Please select an event first.</p>
+        <p class="mt-2 text-sm font-semibold text-amber-700">
+          Go to Events, choose your event, then continue to Booking.
+        </p>
+        <button
+          type="button"
+          class="mt-5 rounded-xl bg-brand-navy px-6 py-3 text-sm font-black uppercase tracking-[0.14em] text-white transition hover:bg-sky-800"
+          @click="router.push('/events')"
+        >
+          Go to Events
+        </button>
+      </div>
 
-          <div class="overflow-x-auto">
-            <div class="mx-auto min-w-[760px] max-w-4xl space-y-2">
-              <div v-for="row in rowGroups" :key="row.rowLabel" class="flex items-center gap-2">
-                <div class="w-6 text-center text-xs font-black text-slate-500">{{ row.rowLabel }}</div>
-                <div class="grid w-[664px] grid-cols-[repeat(14,minmax(0,1fr))] gap-2">
-                  <button
-                    v-for="(unit, unitIndex) in row.units"
-                    :key="unit.key"
-                    type="button"
-                    :disabled="!canSelectSeatUnit(unit)"
-                    @click="toggleSeatUnit(unit)"
-                    :style="seatUnitStyle(row, unitIndex)"
-                    class="h-10 w-full rounded-lg border-b-[3px] text-[11px] font-bold transition"
-                    :class="[seatClass(unit), unit.type === 'pair' ? 'col-span-2' : 'col-span-1']"
-                  >
-                    <span v-if="unit.seats.some((seat) => seat.status === 'SOLD')">X</span>
-                    <span v-else-if="unit.seats.some((seat) => seat.status === 'LOCKED')">X</span>
-                    <span v-else>{{ unit.label }}</span>
-                  </button>
+      <template v-else>
+        <div class="grid gap-6 lg:grid-cols-[3fr_2fr]">
+          <section class="space-y-6">
+            <div class="rounded-[2rem] border border-slate-200 bg-white px-4 pb-8 pt-6 shadow-sm md:px-8">
+              <div class="mx-auto mb-10 max-w-5xl">
+                <div class="h-4 rounded-full bg-gradient-to-b from-amber-300 via-amber-200 to-transparent"></div>
+                <p class="mt-3 text-center text-xs font-black uppercase tracking-[0.3em] text-slate-500">Stage / Venue</p>
+              </div>
+
+              <div class="overflow-x-auto">
+                <div class="mx-auto min-w-[760px] max-w-4xl space-y-2">
+                  <div v-for="row in rowGroups" :key="row.rowLabel" class="flex items-center gap-2">
+                    <div class="w-6 text-center text-xs font-black text-slate-500">{{ row.rowLabel }}</div>
+                    <div class="grid w-[664px] grid-cols-[repeat(14,minmax(0,1fr))] gap-2">
+                      <button
+                        v-for="(unit, unitIndex) in row.units"
+                        :key="unit.key"
+                        type="button"
+                        :disabled="!canSelectSeatUnit(unit)"
+                        @click="toggleSeatUnit(unit)"
+                        :style="seatUnitStyle(row, unitIndex)"
+                        class="h-10 w-full rounded-lg border-b-[3px] text-[11px] font-bold transition"
+                        :class="[seatClass(unit), unit.type === 'pair' ? 'col-span-2' : 'col-span-1']"
+                      >
+                        <span v-if="unit.seats.some((seat) => seat.status === 'SOLD')">X</span>
+                        <span v-else-if="unit.seats.some((seat) => seat.status === 'LOCKED')">X</span>
+                        <span v-else>{{ unit.label }}</span>
+                      </button>
+                    </div>
+                    <div class="w-6 text-center text-xs font-black text-slate-500">{{ row.rowLabel }}</div>
+                  </div>
                 </div>
-                <div class="w-6 text-center text-xs font-black text-slate-500">{{ row.rowLabel }}</div>
+              </div>
+
+              <div class="mt-8 flex flex-wrap justify-center gap-5 text-sm font-bold text-slate-700">
+                <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-slate-500 border border-slate-700"></span> Booked</div>
+                <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-blue-500"></span> Your selection</div>
+                <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-slate-100 border border-slate-300"></span> Standard</div>
+                <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-orange-100 border border-orange-300"></span> VIP</div>
+                <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-rose-100 border border-rose-300"></span> Couple</div>
               </div>
             </div>
-          </div>
 
-          <div class="mt-8 flex flex-wrap justify-center gap-5 text-sm font-bold text-slate-700">
-            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-slate-500 border border-slate-700"></span> Booked</div>
-            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-blue-500"></span> Your selection</div>
-            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-slate-100 border border-slate-300"></span> Standard</div>
-            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-orange-100 border border-orange-300"></span> VIP</div>
-            <div class="flex items-center gap-2"><span class="inline-block h-4 w-4 rounded bg-rose-100 border border-rose-300"></span> Couple</div>
-          </div>
-        </div>
+            <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+              <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500">Selected Seats</p>
+                  <p class="mt-2 text-xl font-black text-brand-navy">
+                    {{ selectedSeatCodes.length > 0 ? selectedSeatCodes.join(", ") : "No seats selected" }}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500">Total</p>
+                  <p class="mt-2 text-2xl font-black text-brand-orange">{{ formatMoney(totalPrice) }}</p>
+                </div>
+                <button
+                  type="button"
+                  :disabled="selectedSeats.length === 0"
+                  @click="continueToCheckout"
+                  class="rounded-2xl bg-brand-navy px-8 py-4 text-sm font-black uppercase tracking-[0.2em] text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  Checkout
+                </button>
+              </div>
+            </div>
+          </section>
 
-        <div class="mt-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-          <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500">Selected Seats</p>
-              <p class="mt-2 text-xl font-black text-brand-navy">
-                {{ selectedSeatCodes.length > 0 ? selectedSeatCodes.join(", ") : "No seats selected" }}
-              </p>
+          <aside class="space-y-6">
+            <div class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+              <div class="h-[240px] bg-slate-100">
+                <img
+                  :src="eventDetail?.bannerUrl || bookingEvent?.bannerUrl || fallbackImage"
+                  :alt="eventDetail?.title || bookingEvent?.title"
+                  class="h-full w-full object-cover"
+                />
+              </div>
+
+              <div class="p-6">
+                <p class="text-xs font-black uppercase tracking-[0.2em] text-brand-orange">Selected event</p>
+                <h2 class="mt-2 text-2xl font-black text-brand-navy">
+                  {{ eventDetail?.title || bookingEvent?.title || "Event detail" }}
+                </h2>
+                <p class="mt-3 text-sm leading-7 text-slate-600">
+                  {{ eventDetail?.description || "Provider is updating detailed event information." }}
+                </p>
+              </div>
             </div>
-            <div>
-              <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500">Total</p>
-              <p class="mt-2 text-2xl font-black text-brand-orange">{{ formatMoney(totalPrice) }}</p>
+
+            <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+              <div class="rounded-2xl bg-slate-50 p-4">
+                <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Venue</p>
+                <p class="mt-2 text-sm font-black text-slate-800">
+                  {{ eventDetail?.locationName || bookingEvent?.location || "Venue TBA" }}
+                </p>
+                <p v-if="eventDetail?.address" class="mt-1 text-sm text-slate-600">{{ eventDetail.address }}</p>
+                <p v-if="eventDetail?.city" class="mt-1 text-sm text-slate-600">{{ eventDetail.city }}</p>
+              </div>
+
+              <div class="mt-4 rounded-2xl bg-slate-50 p-4">
+                <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Information</p>
+                <dl class="mt-2 space-y-2">
+                  <div
+                    v-for="fact in eventInformation"
+                    :key="fact.label"
+                    class="flex items-start justify-between gap-3"
+                  >
+                    <dt class="text-xs font-black uppercase tracking-[0.1em] text-slate-400">{{ fact.label }}</dt>
+                    <dd class="max-w-[68%] text-right text-sm font-bold text-slate-700">{{ fact.value }}</dd>
+                  </div>
+                </dl>
+              </div>
             </div>
-            <button
-              type="button"
-              :disabled="selectedSeats.length === 0"
-              @click="continueToCheckout"
-              class="rounded-2xl bg-brand-navy px-8 py-4 text-sm font-black uppercase tracking-[0.2em] text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              Checkout
-            </button>
-          </div>
+
+            <div v-if="creditsInformation.length" class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+              <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Credits</p>
+              <dl class="mt-2 grid gap-2">
+                <div
+                  v-for="credit in creditsInformation"
+                  :key="credit.label"
+                  class="rounded-xl bg-slate-50 px-3 py-2"
+                >
+                  <dt class="text-[11px] font-black uppercase tracking-[0.08em] text-slate-400">{{ credit.label }}</dt>
+                  <dd class="mt-1 text-sm font-bold text-slate-700">{{ credit.value }}</dd>
+                </div>
+              </dl>
+            </div>
+          </aside>
         </div>
       </template>
     </main>
