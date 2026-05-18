@@ -1,13 +1,16 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { getEvents } from "../api/ticketRushApi";
 import EventCard from "../components/EventCard.vue";
 
+const route = useRoute();
 const eventsPage = ref(null);
 const eventsList = ref([]);
 const loading = ref(true);
 const error = ref("");
 const selectedTab = ref("NOW_SHOWING");
+let activeLoadId = 0;
 
 const tabDefinitions = [
   {
@@ -30,17 +33,41 @@ const tabDefinitions = [
   },
 ];
 
+function queryText(value) {
+  if (Array.isArray(value)) {
+    return queryText(value[0]);
+  }
+  return String(value || "").trim();
+}
+
 async function loadEvents() {
+  const loadId = ++activeLoadId;
+  const params = { size: 50 };
+  if (activeQuery.value) {
+    params.q = activeQuery.value;
+  }
+
   loading.value = true;
   error.value = "";
 
   try {
-    eventsPage.value = await getEvents({ size: 50 });
+    const data = await getEvents(params);
+    if (loadId !== activeLoadId) return;
+    eventsPage.value = data;
     eventsList.value = eventsPage.value?.content || [];
-  } catch (err) {
+    const nextGroup =
+      groupedEvents.value.find((group) => group.id === selectedTab.value && group.events.length > 0) ||
+      groupedEvents.value.find((group) => group.events.length > 0);
+    if (nextGroup) {
+      selectedTab.value = nextGroup.id;
+    }
+  } catch {
+    if (loadId !== activeLoadId) return;
     error.value = "Could not load events. Please check the backend API.";
   } finally {
-    loading.value = false;
+    if (loadId === activeLoadId) {
+      loading.value = false;
+    }
   }
 }
 
@@ -94,21 +121,42 @@ const activeGroup = computed(
   () => groupedEvents.value.find((group) => group.id === selectedTab.value) || groupedEvents.value[0],
 );
 
-onMounted(loadEvents);
+const activeQuery = computed(() => queryText(route.query.q));
+const resultCount = computed(() => eventsPage.value?.totalElements ?? eventsList.value.length);
+
+watch(
+  () => route.query.q,
+  () => {
+    loadEvents();
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
   <div class="bg-brand-light dark:bg-slate-900 min-h-screen pb-20">
     <div class="bg-brand-navy py-16 px-4 text-center text-white mb-12 shadow-inner">
       <h1 class="text-4xl md:text-5xl text-brand-orange mb-4 uppercase tracking-tighter font-black">
-        Events
+        {{ activeQuery ? "Search Results" : "Events" }}
       </h1>
       <p class="text-blue-100 max-w-2xl mx-auto text-lg">
-        Browse tickets by section, then by category: Music, Show, Concert, Cinema, Sport, Festival, and more.
+        <template v-if="activeQuery">
+          Showing events that match "{{ activeQuery }}".
+        </template>
+        <template v-else>
+          Browse tickets by section, then by category: Music, Show, Concert, Cinema, Sport, Festival, and more.
+        </template>
       </p>
     </div>
 
     <div class="max-w-7xl mx-auto px-4 md:px-8">
+      <div
+        v-if="activeQuery && !loading && !error"
+        class="mb-5 text-sm font-bold text-slate-500 dark:text-slate-300"
+      >
+        {{ resultCount }} result{{ resultCount === 1 ? "" : "s" }} for "{{ activeQuery }}"
+      </div>
+
       <div class="bg-white dark:bg-slate-800 rounded-3xl p-3 mb-8 flex flex-wrap gap-3 items-center justify-center">
         <button
           v-for="group in groupedEvents"
@@ -143,7 +191,7 @@ onMounted(loadEvents);
         v-else-if="eventsList.length === 0"
         class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
       >
-        No published events are available yet.
+        {{ activeQuery ? "No events matched your search." : "No published events are available yet." }}
       </div>
 
       <template v-else>
@@ -186,7 +234,7 @@ onMounted(loadEvents);
           v-else
           class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
         >
-          No events in this section yet.
+          {{ activeQuery ? "No matching events in this section." : "No events in this section yet." }}
         </div>
       </template>
     </div>

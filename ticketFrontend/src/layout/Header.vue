@@ -1,8 +1,10 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
+import { useEventSearchSuggestions } from "@/composables/useEventSearchSuggestions";
 
+defineOptions({ name: "AppHeader" });
 defineProps(["isDark"]);
 const emit = defineEmits(["toggle-theme"]);
 
@@ -10,6 +12,15 @@ const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 const showProfileMenu = ref(false);
+const searchTerm = ref("");
+const {
+  suggestionQuery,
+  suggestions: searchSuggestions,
+  suggestionsLoading,
+  showSuggestions,
+  openSuggestions,
+  closeSuggestions,
+} = useEventSearchSuggestions(searchTerm);
 
 const isLoggedIn = computed(() => authStore.isAuthenticated);
 const currentUser = computed(() => authStore.user);
@@ -27,6 +38,7 @@ const initials = computed(() => {
 });
 const isProvider = computed(() => currentRole.value === "PROVIDER");
 const isAdmin = computed(() => currentRole.value === "ADMIN");
+const canUseCatalogSearch = computed(() => !isProvider.value && !isAdmin.value);
 const homePath = computed(() => {
   if (isAdmin.value) return "/admin/dashboard";
   if (isProvider.value) return "/provider/home";
@@ -65,6 +77,9 @@ function closeMenu(event) {
   if (!event.target.closest(".profile-dropdown-container")) {
     showProfileMenu.value = false;
   }
+  if (!event.target.closest(".site-search-container")) {
+    closeSuggestions();
+  }
 }
 
 function isActiveNav(path) {
@@ -74,11 +89,59 @@ function isActiveNav(path) {
   return route.path === path || route.path.startsWith(`${path}/`);
 }
 
+function queryText(value) {
+  if (Array.isArray(value)) {
+    return queryText(value[0]);
+  }
+  return String(value || "").trim();
+}
+
+function handleSearch() {
+  const q = searchTerm.value.trim();
+  showProfileMenu.value = false;
+  closeSuggestions();
+
+  router.push({
+    path: "/events",
+    query: q ? { q } : {},
+  });
+}
+
+function suggestionMeta(event) {
+  return [event.category || "Event", event.location, event.date].filter(Boolean).join(" / ");
+}
+
+function suggestionTarget(event) {
+  if (event.slug) {
+    return { path: `/events/${event.slug}` };
+  }
+  const q = event.title || suggestionQuery.value;
+  return {
+    path: "/events",
+    query: q ? { q } : {},
+  };
+}
+
+function selectSearchSuggestion(event) {
+  searchTerm.value = event.title || suggestionQuery.value;
+  showProfileMenu.value = false;
+  closeSuggestions();
+  router.push(suggestionTarget(event));
+}
+
 async function handleLogout() {
   await authStore.logoutUser();
   showProfileMenu.value = false;
   router.push("/login");
 }
+
+watch(
+  () => [route.path, route.query.q],
+  () => {
+    searchTerm.value = route.path === "/events" ? queryText(route.query.q) : "";
+  },
+  { immediate: true },
+);
 
 onMounted(() => window.addEventListener("click", closeMenu));
 onUnmounted(() => window.removeEventListener("click", closeMenu));
@@ -94,13 +157,85 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
         STAR<span class="text-brand-orange">LIGHT</span>
       </router-link>
 
-      <div class="hidden md:flex flex-1 mx-10">
-        <input
-          type="text"
-          placeholder="Events..."
-          class="w-full max-w-md px-5 py-2 rounded-full text-slate-900 focus:outline-none focus:ring-4 focus:ring-brand-orange/50 transition-all text-base"
-        />
-      </div>
+      <form
+        v-if="canUseCatalogSearch"
+        class="site-search-container hidden flex-1 mx-10 md:flex"
+        role="search"
+        @submit.prevent="handleSearch"
+      >
+        <div class="relative w-full max-w-md">
+          <label for="site-event-search" class="sr-only">Search events</label>
+          <input
+            id="site-event-search"
+            v-model="searchTerm"
+            type="text"
+            placeholder="Search events, city, venue..."
+            class="w-full rounded-full px-5 py-2.5 pr-12 text-base text-slate-900 transition-all focus:outline-none focus:ring-4 focus:ring-brand-orange/50"
+            autocomplete="off"
+            @focus="openSuggestions"
+            @keydown.esc="closeSuggestions"
+          />
+          <button
+            type="submit"
+            class="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full text-brand-navy transition hover:bg-brand-orange hover:text-white"
+            aria-label="Search events"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2.4"
+              />
+            </svg>
+          </button>
+
+          <div
+            v-if="showSuggestions"
+            class="absolute left-0 right-0 top-full z-[140] mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            role="listbox"
+          >
+            <div v-if="suggestionsLoading" class="px-4 py-3 text-sm font-bold text-slate-500 dark:text-slate-300">
+              Searching...
+            </div>
+            <template v-else-if="searchSuggestions.length">
+              <button
+                v-for="event in searchSuggestions"
+                :key="event.id"
+                type="button"
+                class="block w-full px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-700"
+                role="option"
+                @mousedown.prevent
+                @click="selectSearchSuggestion(event)"
+              >
+                <span class="block truncate text-sm font-black">{{ event.title }}</span>
+                <span class="mt-0.5 block truncate text-xs font-semibold text-slate-500 dark:text-slate-300">
+                  {{ suggestionMeta(event) }}
+                </span>
+              </button>
+              <button
+                type="button"
+                class="block w-full border-t border-slate-100 px-4 py-3 text-left text-sm font-black text-brand-orange transition hover:bg-orange-50 dark:border-slate-700 dark:hover:bg-slate-700"
+                @mousedown.prevent
+                @click="handleSearch"
+              >
+                Search all results for "{{ suggestionQuery }}"
+              </button>
+            </template>
+            <button
+              v-else
+              type="button"
+              class="block w-full px-4 py-3 text-left text-sm font-bold text-slate-500 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
+              @mousedown.prevent
+              @click="handleSearch"
+            >
+              Search for "{{ suggestionQuery }}"
+            </button>
+          </div>
+        </div>
+      </form>
 
       <div class="flex items-center gap-4 lg:gap-6">
         <router-link
@@ -260,6 +395,86 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
         </button>
       </div>
     </div>
+
+    <form
+      v-if="canUseCatalogSearch"
+      class="site-search-container relative z-30 bg-brand-navy px-4 pb-3 md:hidden"
+      role="search"
+      @submit.prevent="handleSearch"
+    >
+      <label for="mobile-event-search" class="sr-only">Search events</label>
+      <div class="relative">
+        <input
+          id="mobile-event-search"
+          v-model="searchTerm"
+          type="text"
+          placeholder="Search events..."
+          class="w-full rounded-full px-4 py-2.5 pr-12 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-4 focus:ring-brand-orange/50"
+          autocomplete="off"
+          @focus="openSuggestions"
+          @keydown.esc="closeSuggestions"
+        />
+        <button
+          type="submit"
+          class="absolute right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full text-brand-navy transition hover:bg-brand-orange hover:text-white"
+          aria-label="Search events"
+        >
+          <svg class="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="m21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2.4"
+            />
+          </svg>
+        </button>
+
+        <div
+          v-if="showSuggestions"
+          class="absolute left-4 right-4 top-full z-[140] mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+          role="listbox"
+        >
+          <div v-if="suggestionsLoading" class="px-4 py-3 text-sm font-bold text-slate-500 dark:text-slate-300">
+            Searching...
+          </div>
+          <template v-else-if="searchSuggestions.length">
+            <button
+              v-for="event in searchSuggestions"
+              :key="event.id"
+              type="button"
+              class="block w-full px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-700"
+              role="option"
+              @mousedown.prevent
+              @click="selectSearchSuggestion(event)"
+            >
+              <span class="block truncate text-sm font-black">{{ event.title }}</span>
+              <span class="mt-0.5 block truncate text-xs font-semibold text-slate-500 dark:text-slate-300">
+                {{ suggestionMeta(event) }}
+              </span>
+            </button>
+            <button
+              type="button"
+              class="block w-full border-t border-slate-100 px-4 py-3 text-left text-sm font-black text-brand-orange transition hover:bg-orange-50 dark:border-slate-700 dark:hover:bg-slate-700"
+              @mousedown.prevent
+              @click="handleSearch"
+            >
+              Search all results for "{{ suggestionQuery }}"
+            </button>
+          </template>
+          <button
+            v-else
+            type="button"
+            class="block w-full px-4 py-3 text-left text-sm font-bold text-slate-500 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"
+            @mousedown.prevent
+            @click="handleSearch"
+          >
+            Search for "{{ suggestionQuery }}"
+          </button>
+        </div>
+      </div>
+    </form>
 
     <div class="relative z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 md:px-8 py-3 overflow-x-auto shadow-sm">
       <nav class="flex justify-center gap-10 lg:gap-14 items-center whitespace-nowrap">
