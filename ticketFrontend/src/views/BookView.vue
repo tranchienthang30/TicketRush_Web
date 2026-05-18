@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import {
@@ -30,11 +30,15 @@ const selectedSeatIds = ref([])
 const seatActionLoading = ref(false)
 const seatActionError = ref('')
 const bookingToasts = ref([])
+const selectedSeatsioObjects = ref([])
+const seatsioRenderError = ref('')
 const timerSeconds = ref(SELECT_TIMEOUT_SECONDS)
 let timerHandle = null
 let pollHandle = null
 let toastSequence = 0
 let seatStatusSnapshot = new Map()
+let seatsioChart = null
+let seatsioScriptPromise = null
 
 const fallbackImage =
   'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1600&q=80'
@@ -49,6 +53,8 @@ const visibleSeats = computed(() => {
           ...seat,
           sectionName: section.name,
           seatTypeCode: (seat.seatTypeCode || 'STANDARD').toUpperCase(),
+          seatTypeName: seat.seatTypeName || section.name,
+          visualColorHex: normalizeHexColor(seat.visualColorHex || section.visualColorHex),
           layoutX: seat.layoutX ?? seat.seatNumber,
           layoutY: seat.layoutY ?? rowToIndex(seat.rowLabel),
         })),
@@ -125,6 +131,19 @@ const selectedSeatCodes = computed(() => {
   }
 
   return codes
+})
+const seatLegendItems = computed(() => {
+  const seen = new Set()
+  const items = []
+  for (const seat of visibleSeats.value) {
+    const label = seat.seatTypeName || seat.sectionName || seat.seatTypeCode || 'Standard'
+    const color = seat.visualColorHex || defaultSeatColor(seat.seatTypeCode)
+    const key = `${label.toUpperCase()}-${color}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    items.push({ label, color })
+  }
+  return items
 })
 const totalPrice = computed(() =>
   selectedSeats.value.reduce((sum, seat) => sum + Number(seat.price || 0), 0),
@@ -203,6 +222,19 @@ const timeoutLabel = computed(() => {
   return `${mins}:${secs}`
 })
 const currentUserId = computed(() => String(authStore.user?.id || '').toLowerCase())
+const usesSeatsio = computed(() => bookingEvent.value?.seatProvider === 'SEATS_IO')
+const seatsioReady = computed(() =>
+  Boolean(bookingEvent.value?.externalSeatWorkspaceKey && bookingEvent.value?.externalSeatEventKey),
+)
+const seatsioPricing = computed(() => ({
+  allFeesIncluded: false,
+  showSectionPricingOverlay: true,
+  priceFormatter: (price) => formatMoney(price),
+  prices: (bookingEvent.value?.sections || []).map((section) => ({
+    category: section.name,
+    price: Number(section.basePrice || 0),
+  })),
+}))
 
 function rowToIndex(rowLabel) {
   return (
@@ -242,6 +274,35 @@ function formatDuration(value) {
     return `${hours}h`
   }
   return `${remainingMinutes}m`
+}
+
+function normalizeHexColor(color) {
+  const normalized = String(color || '').trim().toUpperCase()
+  return /^#[0-9A-F]{6}$/.test(normalized) ? normalized : ''
+}
+
+function defaultSeatColor(seatTypeCode) {
+  switch ((seatTypeCode || 'STANDARD').toUpperCase()) {
+    case 'VIP':
+      return '#F97316'
+    case 'COUPLE':
+    case 'SWEETBOX':
+      return '#E11D48'
+    case 'WHEELCHAIR':
+      return '#16A34A'
+    default:
+      return '#CBD5E1'
+  }
+}
+
+function readableTextColor(hexColor) {
+  const color = normalizeHexColor(hexColor).slice(1)
+  if (!color) return '#334155'
+  const red = parseInt(color.slice(0, 2), 16)
+  const green = parseInt(color.slice(2, 4), 16)
+  const blue = parseInt(color.slice(4, 6), 16)
+  const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255
+  return luminance > 0.6 ? '#334155' : '#FFFFFF'
 }
 
 function formatSaleWindow(start, end) {
@@ -345,6 +406,9 @@ function seatClass(unit) {
   }
 
   const leadSeat = unit.seats[0]
+  if (leadSeat.visualColorHex) {
+    return 'hover:opacity-90'
+  }
 
   if (leadSeat.seatTypeCode === 'COUPLE' || leadSeat.seatTypeCode === 'SWEETBOX') {
     return 'bg-rose-100 border-rose-300 text-rose-700 hover:bg-rose-200'
@@ -354,17 +418,36 @@ function seatClass(unit) {
     return 'bg-orange-100 border-orange-300 text-orange-700 hover:bg-orange-200'
   }
 
+  if (leadSeat.seatTypeCode === 'WHEELCHAIR') {
+    return 'bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-200'
+  }
+
   return 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
 }
 
-function seatUnitStyle(row, unitIndex) {
+function seatUnitStyle(row, unitIndex, unit) {
+  const style = {}
   if (unitIndex === 0 && row.offset > 0) {
-    return { gridColumnStart: row.offset + 1 }
+    style.gridColumnStart = row.offset + 1
   }
-  return null
+  const leadSeat = unit?.seats?.[0]
+  if (
+    leadSeat?.visualColorHex &&
+    unit.seats.every((seat) => seat.status === 'AVAILABLE') &&
+    !isUnitSelected(unit)
+  ) {
+    style.backgroundColor = leadSeat.visualColorHex
+    style.borderColor = leadSeat.visualColorHex
+    style.color = readableTextColor(leadSeat.visualColorHex)
+  }
+  return Object.keys(style).length > 0 ? style : null
 }
 
 function continueToCheckout() {
+  if (usesSeatsio.value) {
+    seatActionError.value = 'Seats.io checkout needs object-label checkout wiring before payment can continue.'
+    return
+  }
   if (!bookingEvent.value || selectedSeatIds.value.length === 0) return
 
   sessionStorage.setItem(
@@ -480,7 +563,9 @@ async function refreshSeatMap({ surfaceError = false, notifyChanges = false } = 
     }
 
     bookingEvent.value = latest
-    syncSelectedLocksFromServer()
+    if (!usesSeatsio.value) {
+      syncSelectedLocksFromServer()
+    }
   } catch (err) {
     if (surfaceError) {
       error.value =
@@ -490,6 +575,7 @@ async function refreshSeatMap({ surfaceError = false, notifyChanges = false } = 
 }
 
 function startSeatPolling() {
+  if (usesSeatsio.value) return
   clearInterval(pollHandle)
   pollHandle = setInterval(() => {
     refreshSeatMap({ notifyChanges: true })
@@ -504,6 +590,8 @@ async function loadBookingData() {
   seatActionError.value = ''
   bookingToasts.value = []
   selectedSeatIds.value = []
+  selectedSeatsioObjects.value = []
+  seatsioRenderError.value = ''
   eventDetail.value = null
   categories.value = []
   seatStatusSnapshot = new Map()
@@ -534,12 +622,18 @@ async function loadBookingData() {
       eventDetail.value = eventResponse
       categories.value = categoryResponse
     }
-    startSeatPolling()
+    if (!usesSeatsio.value) {
+      startSeatPolling()
+    }
   } catch {
     bookingEvent.value = null
     error.value = 'Unable to load seat map. Please check event/backend data.'
   } finally {
     loading.value = false
+    if (usesSeatsio.value && bookingEvent.value && !error.value) {
+      await nextTick()
+      await renderSeatsioChart()
+    }
   }
 }
 
@@ -558,7 +652,66 @@ watch(
 onUnmounted(() => {
   clearInterval(timerHandle)
   clearInterval(pollHandle)
+  destroySeatsioChart()
 })
+
+async function renderSeatsioChart() {
+  destroySeatsioChart()
+  if (!usesSeatsio.value || !seatsioReady.value) {
+    seatsioRenderError.value = 'This seats.io event is missing workspace or event keys.'
+    return
+  }
+
+  try {
+    await loadSeatsioScript()
+    seatsioChart = new window.seatsio.SeatingChart({
+      divId: 'seatsio-booking-chart',
+      workspaceKey: bookingEvent.value.externalSeatWorkspaceKey,
+      event: bookingEvent.value.externalSeatEventKey,
+      session: 'continue',
+      pricing: seatsioPricing.value,
+      onObjectSelected: (object) => {
+        const label = object?.label || object?.id
+        if (label && !selectedSeatsioObjects.value.includes(label)) {
+          selectedSeatsioObjects.value = [...selectedSeatsioObjects.value, label]
+        }
+      },
+      onObjectDeselected: (object) => {
+        const label = object?.label || object?.id
+        selectedSeatsioObjects.value = selectedSeatsioObjects.value.filter((item) => item !== label)
+      },
+    }).render()
+  } catch (err) {
+    seatsioRenderError.value = err?.message || 'Unable to render seats.io chart.'
+  }
+}
+
+function destroySeatsioChart() {
+  if (seatsioChart?.destroy) {
+    seatsioChart.destroy()
+  }
+  seatsioChart = null
+}
+
+function loadSeatsioScript() {
+  if (window.seatsio) return Promise.resolve()
+  if (seatsioScriptPromise) return seatsioScriptPromise
+
+  seatsioScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = seatsioCdnUrl()
+    script.async = true
+    script.onload = resolve
+    script.onerror = () => reject(new Error('Unable to load seats.io chart.js'))
+    document.head.appendChild(script)
+  })
+  return seatsioScriptPromise
+}
+
+function seatsioCdnUrl() {
+  const region = import.meta.env.VITE_SEATSIO_REGION || 'eu'
+  return `https://cdn-${region}.seatsio.net/chart.js`
+}
 </script>
 
 <template>
@@ -643,6 +796,34 @@ onUnmounted(() => {
         <div class="grid gap-6 lg:grid-cols-[3fr_2fr]">
           <section class="space-y-6">
             <div
+              v-if="usesSeatsio"
+              class="rounded-[2rem] border border-slate-200 bg-white px-4 pb-8 pt-6 shadow-sm md:px-8"
+            >
+              <div class="mx-auto mb-6 max-w-5xl">
+                <div
+                  class="h-4 rounded-full bg-gradient-to-b from-amber-300 via-amber-200 to-transparent"
+                ></div>
+                <p
+                  class="mt-3 text-center text-xs font-black uppercase tracking-[0.3em] text-slate-500"
+                >
+                  Stage / Venue
+                </p>
+              </div>
+
+              <div
+                v-if="seatsioRenderError"
+                class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700"
+              >
+                {{ seatsioRenderError }}
+              </div>
+              <div
+                id="seatsio-booking-chart"
+                class="min-h-[620px] overflow-hidden rounded-2xl bg-slate-100"
+              ></div>
+            </div>
+
+            <div
+              v-else
               class="rounded-[2rem] border border-slate-200 bg-white px-4 pb-8 pt-6 shadow-sm md:px-8"
             >
               <div class="mx-auto mb-10 max-w-5xl">
@@ -669,7 +850,7 @@ onUnmounted(() => {
                         type="button"
                         :disabled="!canSelectSeatUnit(unit) || seatActionLoading"
                         @click="toggleSeatUnit(unit)"
-                        :style="seatUnitStyle(row, unitIndex)"
+                        :style="seatUnitStyle(row, unitIndex, unit)"
                         class="h-10 w-full rounded-lg border-b-[3px] text-[11px] font-bold transition"
                         :class="[
                           seatClass(unit),
@@ -709,23 +890,12 @@ onUnmounted(() => {
                 <div class="flex items-center gap-2">
                   <span class="inline-block h-4 w-4 rounded bg-blue-500"></span> Your selection
                 </div>
-                <div class="flex items-center gap-2">
+                <div v-for="item in seatLegendItems" :key="`${item.label}-${item.color}`" class="flex items-center gap-2">
                   <span
-                    class="inline-block h-4 w-4 rounded bg-slate-100 border border-slate-300"
+                    class="inline-block h-4 w-4 rounded border border-slate-300"
+                    :style="{ backgroundColor: item.color }"
                   ></span>
-                  Standard
-                </div>
-                <div class="flex items-center gap-2">
-                  <span
-                    class="inline-block h-4 w-4 rounded bg-orange-100 border border-orange-300"
-                  ></span>
-                  VIP
-                </div>
-                <div class="flex items-center gap-2">
-                  <span
-                    class="inline-block h-4 w-4 rounded bg-rose-100 border border-rose-300"
-                  ></span>
-                  Couple
+                  {{ item.label }}
                 </div>
               </div>
             </div>
@@ -734,11 +904,15 @@ onUnmounted(() => {
               <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500">
-                    Selected Seats
+                    {{ usesSeatsio ? 'Selected objects' : 'Selected Seats' }}
                   </p>
                   <p class="mt-2 text-xl font-black text-brand-navy">
                     {{
-                      selectedSeatCodes.length > 0
+                      usesSeatsio
+                        ? selectedSeatsioObjects.length > 0
+                          ? selectedSeatsioObjects.join(', ')
+                          : 'No seats selected'
+                        : selectedSeatCodes.length > 0
                         ? selectedSeatCodes.join(', ')
                         : 'No seats selected'
                     }}
@@ -752,13 +926,19 @@ onUnmounted(() => {
                 </div>
                 <button
                   type="button"
-                  :disabled="selectedSeatIds.length === 0 || seatActionLoading"
+                  :disabled="usesSeatsio ? selectedSeatsioObjects.length === 0 : selectedSeatIds.length === 0 || seatActionLoading"
                   @click="continueToCheckout"
                   class="rounded-2xl bg-brand-navy px-8 py-4 text-sm font-black uppercase tracking-[0.2em] text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
                   Checkout
                 </button>
               </div>
+              <p
+                v-if="usesSeatsio && seatActionError"
+                class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700"
+              >
+                {{ seatActionError }}
+              </p>
             </div>
           </section>
 

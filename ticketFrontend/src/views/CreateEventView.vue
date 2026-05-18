@@ -1,18 +1,27 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
-import { useRouter, RouterLink } from "vue-router";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
+import { useRoute, useRouter, RouterLink } from "vue-router";
 import { useAuthStore } from "@/stores/authStore";
 import * as eventApi from "@/api/event.api";
 import * as providerApi from "@/api/provider.api";
+import * as seatsioApi from "@/api/seatsio.api";
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 
 const currentStep = ref(1);
 const categories = ref([]);
 const loading = ref(false);
+const uploadLoading = ref(false);
 const error = ref("");
 const message = ref("");
+const seatsioWorkspace = ref(null);
+const seatsioLoading = ref(false);
+const seatsioMessage = ref("");
+const seatsioError = ref("");
+let seatsioScriptPromise = null;
+let seatsioDesigner = null;
 
 const form = reactive({
   title: "",
@@ -37,8 +46,20 @@ const form = reactive({
   saleEndTime: "",
   seatProvider: "INTERNAL",
   externalSeatChartKey: "",
+  externalSeatWorkspaceKey: "",
+  externalSeatEventKey: "",
+  seatsioVenueType: "WITH_SECTIONS_AND_FLOORS",
   sections: [
     { name: "Standard", basePrice: 300000, rowCount: 5, seatsPerRow: 20 },
+  ],
+  internalSeatRows: [
+    {
+      rowLabel: "A",
+      seatCount: 20,
+      ranges: [
+        { startSeat: 1, endSeat: 20, seatTypeCode: "STANDARD", seatTypeName: "Standard", visualColorHex: "#CBD5E1", price: 300000, status: "AVAILABLE", accessible: false },
+      ],
+    },
   ],
   payoutBankName: "",
   payoutAccountName: "",
@@ -49,13 +70,62 @@ const form = reactive({
 const isProviderReady = computed(() =>
   ["PROVIDER", "ADMIN"].includes(authStore.user?.role)
 );
+const isEditMode = computed(() => Boolean(route.params.id));
 
 const providerRequestStatus = computed(() => authStore.user?.providerRequestStatus || null);
+const seatTypeOptions = [
+  { value: "STANDARD", label: "Standard", color: "#CBD5E1" },
+  { value: "VIP", label: "VIP", color: "#F97316" },
+  { value: "COUPLE", label: "Couple", color: "#E11D48" },
+  { value: "SWEETBOX", label: "Sweetbox", color: "#E11D48" },
+  { value: "WHEELCHAIR", label: "Accessible", color: "#16A34A" },
+];
+
+const configuredSeatTypes = computed(() => {
+  const seen = new Set();
+  const items = [];
+  for (const row of form.internalSeatRows) {
+    for (const range of row.ranges || []) {
+      const label = String(range.seatTypeName || seatTypeLabel(range.seatTypeCode)).trim();
+      const color = normalizeHexColor(range.visualColorHex) || seatTypeColor(range.seatTypeCode);
+      const key = `${label.toUpperCase()}-${color}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({ label, color });
+    }
+  }
+  return items.length > 0 ? items : [{ label: "Standard", color: "#CBD5E1" }];
+});
 
 onMounted(async () => {
   const response = await eventApi.getCategories();
   categories.value = response.data;
+  if (isProviderReady.value) {
+    await loadSeatsioWorkspace();
+  }
+  if (isEditMode.value) {
+    await loadEventForEdit();
+  }
 });
+
+watch(
+  () => form.listingType,
+  (listingType) => {
+    if (listingType === "NOW_SHOWING" || listingType === "SPECIAL") {
+      const nowValue = toDatetimeLocal(new Date().toISOString());
+      if (!form.saleStartTime || new Date(form.saleStartTime).getTime() > Date.now()) {
+        form.saleStartTime = nowValue;
+      }
+      if (!form.saleEndTime || new Date(form.saleEndTime).getTime() < Date.now()) {
+        const eventEndMs = form.endTime ? new Date(form.endTime).getTime() : null;
+        form.saleEndTime =
+          Number.isFinite(eventEndMs) && eventEndMs > Date.now()
+            ? form.endTime
+            : toDatetimeLocal(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
+      }
+    }
+  },
+);
 
 async function requestProviderVerification() {
   error.value = "";
@@ -77,8 +147,8 @@ function addSection() {
   form.sections.push({
     name: `Section ${form.sections.length + 1}`,
     basePrice: 300000,
-    rowCount: 3,
-    seatsPerRow: 20,
+    rowCount: form.seatProvider === "SEATS_IO" ? 1 : 3,
+    seatsPerRow: form.seatProvider === "SEATS_IO" ? 1 : 20,
   });
 }
 
@@ -86,6 +156,76 @@ function removeSection(index) {
   if (form.sections.length > 1) {
     form.sections.splice(index, 1);
   }
+}
+
+function addSeatRow() {
+  const label = nextRowLabel(form.internalSeatRows.length);
+  form.internalSeatRows.push({
+    rowLabel: label,
+    seatCount: 20,
+    ranges: [
+      defaultSeatRange(1, 20),
+    ],
+  });
+}
+
+function removeSeatRow(index) {
+  if (form.internalSeatRows.length > 1) {
+    form.internalSeatRows.splice(index, 1);
+  }
+}
+
+function addSeatRange(row) {
+  row.ranges.push({
+    ...defaultSeatRange(1, Math.min(Number(row.seatCount || 1), 1)),
+  });
+}
+
+function removeSeatRange(row, rangeIndex) {
+  if (row.ranges.length > 1) {
+    row.ranges.splice(rangeIndex, 1);
+  }
+}
+
+function defaultSeatRange(startSeat = 1, endSeat = 1) {
+  return {
+    startSeat,
+    endSeat,
+    seatTypeCode: "STANDARD",
+    seatTypeName: "Standard",
+    visualColorHex: "#CBD5E1",
+    price: 300000,
+    status: "AVAILABLE",
+    accessible: false,
+  };
+}
+
+function seatTypeOption(code) {
+  return seatTypeOptions.find((type) => type.value === code) || seatTypeOptions[0];
+}
+
+function seatTypeLabel(code) {
+  return seatTypeOption(code).label;
+}
+
+function seatTypeColor(code) {
+  return seatTypeOption(code).color;
+}
+
+function normalizeHexColor(color) {
+  const normalized = String(color || "").trim().toUpperCase();
+  return /^#[0-9A-F]{6}$/.test(normalized) ? normalized : "";
+}
+
+function applySeatTypePreset(range) {
+  const option = seatTypeOption(range.seatTypeCode);
+  if (!range.seatTypeName || seatTypeOptions.some((type) => type.label === range.seatTypeName)) {
+    range.seatTypeName = option.label;
+  }
+  if (!normalizeHexColor(range.visualColorHex) || seatTypeOptions.some((type) => type.color === range.visualColorHex)) {
+    range.visualColorHex = option.color;
+  }
+  range.accessible = range.seatTypeCode === "WHEELCHAIR" ? true : Boolean(range.accessible);
 }
 
 function nextStep() {
@@ -99,6 +239,9 @@ function nextStep() {
     return;
   }
   currentStep.value += 1;
+  if (currentStep.value === 2 && form.seatProvider === "SEATS_IO") {
+    nextTick(renderSeatsioDesigner);
+  }
 }
 
 function previousStep() {
@@ -115,12 +258,51 @@ async function submitEvent() {
 
   loading.value = true;
   try {
+    if (isEditMode.value) {
+      await eventApi.updateEvent(route.params.id, toPayload());
+      router.push("/my-events");
+      return;
+    }
     const response = await eventApi.createEvent(toPayload());
-    router.push(`/events?created=${response.data.slug}`);
+    router.push(`/events/${response.data.slug}`);
   } catch (err) {
-    error.value = err.response?.data?.message || "Unable to create event.";
+    error.value = err.response?.data?.message || (isEditMode.value ? "Unable to update event." : "Unable to create event.");
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadEventForEdit() {
+  loading.value = true;
+  error.value = "";
+  try {
+    const response = await eventApi.getMyEvent(route.params.id);
+    fillForm(response.data);
+    if (form.seatProvider === "SEATS_IO") {
+      await nextTick();
+      await renderSeatsioDesigner();
+    }
+  } catch (err) {
+    error.value = err.response?.data?.message || "Unable to load event for editing.";
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function uploadBanner(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  uploadLoading.value = true;
+  error.value = "";
+  try {
+    const response = await eventApi.uploadEventBanner(file);
+    form.bannerUrl = response.data.url;
+    message.value = "Banner image uploaded.";
+  } catch (err) {
+    error.value = err.response?.data?.message || "Unable to upload banner image.";
+  } finally {
+    uploadLoading.value = false;
+    event.target.value = "";
   }
 }
 
@@ -138,11 +320,45 @@ function isStepOneValid() {
 
 function isStepTwoValid() {
   if (form.seatProvider === "SEATS_IO") {
-    return Boolean(form.externalSeatChartKey);
+    return Boolean(form.externalSeatWorkspaceKey && form.externalSeatChartKey && form.externalSeatEventKey) && areSectionsValid();
   }
+  return areInternalSeatRowsValid();
+}
+
+function areSectionsValid() {
   return form.sections.length > 0 && form.sections.every((section) =>
     section.name && section.basePrice >= 0 && section.rowCount > 0 && section.seatsPerRow > 0
   );
+}
+
+function areInternalSeatRowsValid() {
+  const labels = new Set();
+  return form.internalSeatRows.length > 0 && form.internalSeatRows.every((row) => {
+    const label = String(row.rowLabel || "").trim().toUpperCase();
+    if (!label || labels.has(label) || Number(row.seatCount) < 1) return false;
+    labels.add(label);
+    const usedSeats = new Set();
+    return row.ranges.length > 0 && row.ranges.every((range) => {
+      const start = Number(range.startSeat);
+      const end = Number(range.endSeat);
+      if (
+        !range.seatTypeCode ||
+        !String(range.seatTypeName || "").trim() ||
+        !normalizeHexColor(range.visualColorHex) ||
+        Number(range.price) < 0 ||
+        start < 1 ||
+        end < start ||
+        end > Number(row.seatCount)
+      ) {
+        return false;
+      }
+      for (let seat = start; seat <= end; seat += 1) {
+        if (usedSeats.has(seat)) return false;
+        usedSeats.add(seat);
+      }
+      return true;
+    });
+  });
 }
 
 function toPayload() {
@@ -169,6 +385,8 @@ function toPayload() {
     saleEndTime: form.saleEndTime ? toInstant(form.saleEndTime) : null,
     seatProvider: form.seatProvider,
     externalSeatChartKey: form.seatProvider === "SEATS_IO" ? form.externalSeatChartKey : null,
+    externalSeatWorkspaceKey: form.seatProvider === "SEATS_IO" ? form.externalSeatWorkspaceKey : null,
+    externalSeatEventKey: form.seatProvider === "SEATS_IO" ? form.externalSeatEventKey : null,
     payoutBankName: form.payoutBankName || null,
     payoutAccountName: form.payoutAccountName || null,
     payoutAccountNumber: form.payoutAccountNumber || null,
@@ -176,14 +394,243 @@ function toPayload() {
     sections: form.sections.map((section) => ({
       name: section.name,
       basePrice: Number(section.basePrice),
-      rowCount: Number(section.rowCount),
-      seatsPerRow: Number(section.seatsPerRow),
+      rowCount: form.seatProvider === "SEATS_IO" ? 1 : Number(section.rowCount),
+      seatsPerRow: form.seatProvider === "SEATS_IO" ? 1 : Number(section.seatsPerRow),
     })),
+    internalSeatRows: form.seatProvider === "INTERNAL"
+      ? form.internalSeatRows.map((row) => ({
+        rowLabel: String(row.rowLabel || "").trim().toUpperCase(),
+        seatCount: Number(row.seatCount),
+        ranges: row.ranges.map((range) => ({
+          startSeat: Number(range.startSeat),
+          endSeat: Number(range.endSeat),
+          seatTypeCode: range.seatTypeCode,
+          seatTypeName: String(range.seatTypeName || seatTypeLabel(range.seatTypeCode)).trim(),
+          visualColorHex: normalizeHexColor(range.visualColorHex) || seatTypeColor(range.seatTypeCode),
+          price: Number(range.price),
+          status: range.status,
+          accessible: Boolean(range.accessible),
+        })),
+      }))
+      : null,
   };
 }
 
 function toInstant(value) {
   return new Date(value).toISOString();
+}
+
+function fillForm(event) {
+  form.title = event.title || "";
+  form.description = event.description || "";
+  form.genre = event.genre || "";
+  form.country = event.country || "";
+  form.authorName = event.authorName || "";
+  form.directorName = event.directorName || "";
+  form.castMembers = event.castMembers || "";
+  form.performerNames = event.performerNames || "";
+  form.singerNames = event.singerNames || "";
+  form.bannerUrl = event.bannerUrl || "";
+  form.categoryId = event.categoryId || "";
+  form.durationMinutes = event.durationMinutes || 120;
+  form.listingType = event.listingType || "NOW_SHOWING";
+  form.locationName = event.locationName || "";
+  form.city = event.city || "";
+  form.address = event.address || "";
+  form.startTime = toDatetimeLocal(event.startTime);
+  form.endTime = toDatetimeLocal(event.endTime);
+  form.saleStartTime = toDatetimeLocal(event.saleStartTime);
+  form.saleEndTime = toDatetimeLocal(event.saleEndTime);
+  form.seatProvider = event.seatProvider || "INTERNAL";
+  form.externalSeatChartKey = event.externalSeatChartKey || "";
+  form.externalSeatWorkspaceKey = event.externalSeatWorkspaceKey || "";
+  form.externalSeatEventKey = event.externalSeatEventKey || "";
+  form.sections = Array.isArray(event.sections) && event.sections.length > 0
+    ? event.sections.map((section) => ({
+      name: section.name,
+      basePrice: Number(section.basePrice || 0),
+      rowCount: event.seatProvider === "SEATS_IO" ? 1 : Number(section.rowCount || 1),
+      seatsPerRow: event.seatProvider === "SEATS_IO" ? 1 : Number(section.seatsPerRow || 1),
+    }))
+    : [{ name: "Standard", basePrice: 300000, rowCount: 1, seatsPerRow: 1 }];
+  form.internalSeatRows = Array.isArray(event.internalSeatRows) && event.internalSeatRows.length > 0
+    ? event.internalSeatRows.map((row) => ({
+      rowLabel: row.rowLabel,
+      seatCount: Number(row.seatCount || 1),
+      ranges: Array.isArray(row.ranges) && row.ranges.length > 0
+        ? row.ranges.map((range) => ({
+          startSeat: Number(range.startSeat),
+          endSeat: Number(range.endSeat),
+          seatTypeCode: range.seatTypeCode || "STANDARD",
+          seatTypeName: range.seatTypeName || seatTypeLabel(range.seatTypeCode || "STANDARD"),
+          visualColorHex: normalizeHexColor(range.visualColorHex) || seatTypeColor(range.seatTypeCode || "STANDARD"),
+          price: Number(range.price || 0),
+          status: range.status === "SOLD" ? "SOLD" : "AVAILABLE",
+          accessible: Boolean(range.accessible),
+        }))
+        : [{ ...defaultSeatRange(1, Number(row.seatCount || 1)), price: Number(event.minPrice || 300000) }],
+    }))
+    : [
+      {
+        rowLabel: "A",
+        seatCount: 20,
+        ranges: [
+          { ...defaultSeatRange(1, 20), price: Number(event.minPrice || 300000) },
+        ],
+      },
+    ];
+  form.termsAccepted = true;
+}
+
+function toDatetimeLocal(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offsetMs = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function nextRowLabel(index) {
+  let label = "";
+  let value = index;
+  do {
+    label = String.fromCharCode(65 + (value % 26)) + label;
+    value = Math.floor(value / 26) - 1;
+  } while (value >= 0);
+  return label;
+}
+
+function useSeatProvider(provider) {
+  form.seatProvider = provider;
+  seatsioError.value = "";
+  if (provider === "SEATS_IO") {
+    if (!seatsioWorkspace.value) {
+      loadSeatsioWorkspace();
+    }
+    nextTick(renderSeatsioDesigner);
+  } else {
+    destroySeatsioDesigner();
+  }
+}
+
+async function loadSeatsioWorkspace() {
+  seatsioError.value = "";
+  try {
+    const response = await seatsioApi.getWorkspace();
+    applyWorkspace(response.data);
+  } catch (err) {
+    seatsioError.value = err.response?.data?.message || "Unable to load seats.io workspace.";
+  }
+}
+
+async function ensureSeatsioWorkspace() {
+  seatsioLoading.value = true;
+  seatsioError.value = "";
+  seatsioMessage.value = "";
+  try {
+    const response = await seatsioApi.ensureWorkspace();
+    applyWorkspace(response.data);
+    seatsioMessage.value = "Seats.io workspace is ready for this provider.";
+    await nextTick();
+    await renderSeatsioDesigner();
+  } catch (err) {
+    seatsioError.value = err.response?.data?.message || "Unable to create seats.io workspace.";
+  } finally {
+    seatsioLoading.value = false;
+  }
+}
+
+async function createSeatsioChart() {
+  seatsioLoading.value = true;
+  seatsioError.value = "";
+  seatsioMessage.value = "";
+  try {
+    const response = await seatsioApi.createChart({
+      name: form.title || "TicketRush chart",
+      venueType: form.seatsioVenueType,
+    });
+    form.externalSeatChartKey = response.data.key;
+    seatsioMessage.value = "Chart created. Use the designer below to publish the seating layout.";
+    await nextTick();
+    await renderSeatsioDesigner();
+  } catch (err) {
+    seatsioError.value = err.response?.data?.message || "Unable to create seats.io chart.";
+  } finally {
+    seatsioLoading.value = false;
+  }
+}
+
+async function createSeatsioEventFromChart() {
+  if (!form.externalSeatChartKey) {
+    seatsioError.value = "Create or enter a chart key first.";
+    return;
+  }
+  seatsioLoading.value = true;
+  seatsioError.value = "";
+  seatsioMessage.value = "";
+  try {
+    const response = await seatsioApi.createSeatsioEvent({
+      chartKey: form.externalSeatChartKey,
+      name: form.title || "TicketRush event",
+      date: form.startTime ? form.startTime.slice(0, 10) : null,
+    });
+    form.externalSeatEventKey = response.data.eventKey;
+    seatsioMessage.value = "Seats.io event created from this chart.";
+  } catch (err) {
+    seatsioError.value = err.response?.data?.message || "Unable to create seats.io event.";
+  } finally {
+    seatsioLoading.value = false;
+  }
+}
+
+function applyWorkspace(workspace) {
+  seatsioWorkspace.value = workspace;
+  if (workspace?.workspaceKey && !form.externalSeatWorkspaceKey) {
+    form.externalSeatWorkspaceKey = workspace.workspaceKey;
+  }
+}
+
+async function renderSeatsioDesigner() {
+  if (
+    form.seatProvider !== "SEATS_IO" ||
+    !form.externalSeatChartKey ||
+    !seatsioWorkspace.value?.secretKey
+  ) {
+    return;
+  }
+  try {
+    await loadSeatsioScript(seatsioWorkspace.value.cdnUrl);
+    destroySeatsioDesigner();
+    seatsioDesigner = new window.seatsio.SeatingChartDesigner({
+      divId: "seatsio-designer",
+      secretKey: seatsioWorkspace.value.secretKey,
+      chartKey: form.externalSeatChartKey,
+    }).render();
+  } catch (err) {
+    seatsioError.value = err?.message || "Unable to load seats.io designer.";
+  }
+}
+
+function destroySeatsioDesigner() {
+  if (seatsioDesigner?.destroy) {
+    seatsioDesigner.destroy();
+  }
+  seatsioDesigner = null;
+}
+
+function loadSeatsioScript(cdnUrl) {
+  if (window.seatsio) return Promise.resolve();
+  if (seatsioScriptPromise) return seatsioScriptPromise;
+
+  seatsioScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = cdnUrl || "https://cdn-eu.seatsio.net/chart.js";
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Unable to load seats.io chart.js"));
+    document.head.appendChild(script);
+  });
+  return seatsioScriptPromise;
 }
 </script>
 
@@ -223,7 +670,7 @@ function toInstant(value) {
 
       <div v-else class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
         <aside class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 h-fit sticky top-32">
-          <h2 class="font-black text-brand-navy dark:text-white mb-5">Create event</h2>
+          <h2 class="font-black text-brand-navy dark:text-white mb-5">{{ isEditMode ? "Edit event" : "Create event" }}</h2>
           <ol class="space-y-3">
             <li v-for="step in [
               { id: 1, label: 'Event information' },
@@ -240,7 +687,7 @@ function toInstant(value) {
 
         <main class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm p-6 md:p-8">
           <div class="mb-6 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-5">
-            <h1 class="text-2xl font-black text-brand-navy dark:text-white mb-2">Provider rules</h1>
+            <h1 class="text-2xl font-black text-brand-navy dark:text-white mb-2">{{ isEditMode ? "Update event" : "Provider rules" }}</h1>
             <ul class="text-sm text-slate-600 dark:text-slate-300 space-y-1 list-disc pl-5">
               <li>Use accurate event information, official images, venue, and sale period.</li>
               <li>Ticket sections and seat labels must match the actual venue setup.</li>
@@ -266,6 +713,16 @@ function toInstant(value) {
                 <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Banner image URL</span>
                 <input v-model.trim="form.bannerUrl" placeholder="https://..." class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
               </label>
+              <label class="block md:col-span-2">
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Upload banner image</span>
+                <input type="file" accept="image/png,image/jpeg,image/webp" class="w-full px-4 py-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" @change="uploadBanner" />
+                <span class="mt-2 block text-xs font-bold text-slate-500">
+                  {{ uploadLoading ? "Uploading..." : "JPG, PNG, or WebP up to 5MB." }}
+                </span>
+              </label>
+              <div v-if="form.bannerUrl" class="md:col-span-2 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100">
+                <img :src="form.bannerUrl" alt="Event banner preview" class="h-56 w-full object-cover" />
+              </div>
               <label class="block">
                 <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Genre</span>
                 <input v-model.trim="form.genre" placeholder="Pop concert, comedy, animation..." class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
@@ -347,40 +804,167 @@ function toInstant(value) {
           <div v-if="currentStep === 2" class="space-y-5">
             <h2 class="text-xl font-black text-slate-900 dark:text-white">Seat setup</h2>
             <div class="grid grid-cols-2 gap-3 max-w-md">
-              <button type="button" :class="form.seatProvider === 'INTERNAL' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold" @click="form.seatProvider = 'INTERNAL'">Internal</button>
-              <button type="button" :class="form.seatProvider === 'SEATS_IO' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold" @click="form.seatProvider = 'SEATS_IO'">seats.io</button>
+              <button type="button" :disabled="isEditMode" :class="form.seatProvider === 'INTERNAL' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold disabled:opacity-60" @click="useSeatProvider('INTERNAL')">Internal</button>
+              <button type="button" :disabled="isEditMode" :class="form.seatProvider === 'SEATS_IO' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold disabled:opacity-60" @click="useSeatProvider('SEATS_IO')">seats.io</button>
             </div>
 
-            <div v-if="form.seatProvider === 'SEATS_IO'" class="rounded-xl border border-blue-200 bg-blue-50 p-5 text-blue-950">
-              <p class="font-black mb-2">seats.io integration placeholder</p>
-              <p class="text-sm mb-4">Create the chart in seats.io, then paste its chart key here. The backend stores the key and keeps local ticket/seat ownership in TicketRush.</p>
-              <label class="block">
-                <span class="block text-sm font-bold mb-2">Chart key</span>
-                <input v-model.trim="form.externalSeatChartKey" placeholder="chart-key-from-seats-io" class="w-full px-4 py-3 rounded-xl border border-blue-200 bg-white text-slate-900" />
-              </label>
+            <div v-if="form.seatProvider === 'SEATS_IO'" class="space-y-5">
+              <div class="rounded-xl border border-blue-200 bg-blue-50 p-5 text-blue-950">
+                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p class="font-black">seats.io provider workspace</p>
+                    <p class="mt-1 text-sm">
+                      Each provider gets a separate workspace. TicketRush keeps the secret key server-side and uses it only inside provider tools.
+                    </p>
+                    <p v-if="seatsioWorkspace?.workspaceKey" class="mt-2 text-xs font-bold text-blue-800">
+                      Workspace: {{ seatsioWorkspace.workspaceName }} / {{ seatsioWorkspace.workspaceKey }}
+                    </p>
+                    <p v-else-if="seatsioWorkspace?.message" class="mt-2 text-xs font-bold text-blue-800">
+                      {{ seatsioWorkspace.message }}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    :disabled="seatsioLoading"
+                    class="rounded-xl bg-brand-navy px-4 py-3 text-sm font-black text-white disabled:opacity-60"
+                    @click="ensureSeatsioWorkspace"
+                  >
+                    {{ seatsioLoading ? "Working..." : "Prepare workspace" }}
+                  </button>
+                </div>
+                <p v-if="seatsioMessage" class="mt-4 rounded-lg bg-green-50 px-3 py-2 text-sm font-bold text-green-700">{{ seatsioMessage }}</p>
+                <p v-if="seatsioError" class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{{ seatsioError }}</p>
+              </div>
+
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <label class="block">
+                  <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Workspace key</span>
+                  <input v-model.trim="form.externalSeatWorkspaceKey" placeholder="public workspace key" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+                </label>
+                <label class="block">
+                  <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Chart key</span>
+                  <input v-model.trim="form.externalSeatChartKey" placeholder="chart key" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" @change="renderSeatsioDesigner" />
+                </label>
+                <label class="block">
+                  <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Event key</span>
+                  <input v-model.trim="form.externalSeatEventKey" placeholder="event key" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+                </label>
+              </div>
+
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
+                <label class="block">
+                  <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Chart type</span>
+                  <select v-model="form.seatsioVenueType" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                    <option value="WITH_SECTIONS_AND_FLOORS">Sections and floors</option>
+                    <option value="SIMPLE">Simple</option>
+                    <option value="WITH_ZONES">Zones</option>
+                  </select>
+                </label>
+                <button type="button" :disabled="seatsioLoading" class="rounded-xl border border-brand-orange px-4 py-3 font-black text-brand-orange disabled:opacity-60" @click="createSeatsioChart">
+                  Create chart
+                </button>
+                <button type="button" :disabled="seatsioLoading || !form.externalSeatChartKey" class="rounded-xl bg-brand-orange px-4 py-3 font-black text-white disabled:opacity-60" @click="createSeatsioEventFromChart">
+                  Create event
+                </button>
+              </div>
+
+              <div class="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <p class="font-black text-slate-900 dark:text-white">Chart designer</p>
+                  <button type="button" class="text-sm font-black text-brand-orange hover:underline" @click="renderSeatsioDesigner">
+                    Reload designer
+                  </button>
+                </div>
+                <div class="overflow-x-auto">
+                  <div id="seatsio-designer" class="h-[760px] min-h-[760px] min-w-[1080px] overflow-visible rounded-xl bg-slate-100 dark:bg-slate-900"></div>
+                </div>
+              </div>
+
+              <div class="space-y-4">
+                <p class="font-black text-slate-900 dark:text-white">Ticket categories shown in TicketRush checkout</p>
+                <div v-for="(section, index) in form.sections" :key="index" class="grid grid-cols-1 md:grid-cols-5 gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                  <label class="block md:col-span-2">
+                    <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Category</span>
+                    <input v-model.trim="section.name" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white" />
+                  </label>
+                  <label class="block">
+                    <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Price</span>
+                    <input v-model.number="section.basePrice" type="number" min="0" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white" />
+                  </label>
+                  <input v-model.number="section.rowCount" type="hidden" />
+                  <input v-model.number="section.seatsPerRow" type="hidden" />
+                  <button type="button" class="md:col-span-5 text-left text-sm font-bold text-red-600" @click="removeSection(index)">Remove category</button>
+                </div>
+                <button type="button" class="rounded-xl border border-brand-orange px-4 py-2 font-bold text-brand-orange" @click="addSection">Add category</button>
+              </div>
             </div>
 
             <div v-else class="space-y-4">
-              <div v-for="(section, index) in form.sections" :key="index" class="grid grid-cols-1 md:grid-cols-5 gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-                <label class="block md:col-span-2">
-                  <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Name</span>
-                  <input v-model.trim="section.name" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white" />
-                </label>
-                <label class="block">
-                  <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Price</span>
-                  <input v-model.number="section.basePrice" type="number" min="0" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white" />
-                </label>
-                <label class="block">
-                  <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Rows</span>
-                  <input v-model.number="section.rowCount" type="number" min="1" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white" />
-                </label>
-                <label class="block">
-                  <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Seats/row</span>
-                  <input v-model.number="section.seatsPerRow" type="number" min="1" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white" />
-                </label>
-                <button type="button" class="md:col-span-5 text-left text-sm font-bold text-red-600" @click="removeSection(index)">Remove section</button>
+              <div class="flex flex-wrap gap-4 rounded-xl border border-slate-200 p-4 text-sm font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                <span v-for="type in configuredSeatTypes" :key="`${type.label}-${type.color}`" class="flex items-center gap-2">
+                  <span class="h-4 w-4 rounded" :style="{ backgroundColor: type.color }"></span>
+                  {{ type.label }}
+                </span>
               </div>
-              <button type="button" class="rounded-xl border border-brand-orange px-4 py-2 font-bold text-brand-orange" @click="addSection">Add section</button>
+
+              <div v-for="(row, rowIndex) in form.internalSeatRows" :key="rowIndex" class="space-y-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-[120px_160px_1fr_auto] md:items-end">
+                  <label class="block">
+                    <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Row</span>
+                    <input v-model.trim="row.rowLabel" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white" />
+                  </label>
+                  <label class="block">
+                    <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Seats in row</span>
+                    <input v-model.number="row.seatCount" type="number" min="1" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white" />
+                  </label>
+                  <p class="text-sm font-bold text-slate-500 dark:text-slate-300">
+                    Configure non-overlapping ranges inside this row. Seat cells shown to customers keep labels like {{ row.rowLabel || 'A' }}1.
+                  </p>
+                  <button type="button" class="text-sm font-bold text-red-600" @click="removeSeatRow(rowIndex)">Remove row</button>
+                </div>
+
+                <div class="space-y-3">
+                  <div v-for="(range, rangeIndex) in row.ranges" :key="rangeIndex" class="grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-900 md:grid-cols-9 md:items-end">
+                    <label class="block">
+                      <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">From</span>
+                      <input v-model.number="range.startSeat" type="number" min="1" :max="row.seatCount" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white" />
+                    </label>
+                    <label class="block">
+                      <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">To</span>
+                      <input v-model.number="range.endSeat" type="number" min="1" :max="row.seatCount" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white" />
+                    </label>
+                    <label class="block">
+                      <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Behavior</span>
+                      <select v-model="range.seatTypeCode" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white" @change="applySeatTypePreset(range)">
+                        <option v-for="type in seatTypeOptions" :key="type.value" :value="type.value">{{ type.label }}</option>
+                      </select>
+                    </label>
+                    <label class="block md:col-span-2">
+                      <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Display type</span>
+                      <input v-model.trim="range.seatTypeName" placeholder="Early Bird, Premium..." class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white" />
+                    </label>
+                    <label class="block">
+                      <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Color</span>
+                      <input v-model="range.visualColorHex" type="color" class="h-10 w-full rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800" />
+                    </label>
+                    <label class="block">
+                      <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Price</span>
+                      <input v-model.number="range.price" type="number" min="0" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white" />
+                    </label>
+                    <label class="block">
+                      <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Initial status</span>
+                      <select v-model="range.status" class="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white">
+                        <option value="AVAILABLE">Available</option>
+                        <option value="SOLD">Booked</option>
+                      </select>
+                    </label>
+                    <button type="button" class="text-left text-sm font-bold text-red-600" @click="removeSeatRange(row, rangeIndex)">Remove</button>
+                  </div>
+                </div>
+
+                <button type="button" class="rounded-xl border border-brand-orange px-4 py-2 font-bold text-brand-orange" @click="addSeatRange(row)">Add range</button>
+              </div>
+              <button type="button" class="rounded-xl bg-brand-navy px-4 py-2 font-bold text-white" @click="addSeatRow">Add row</button>
             </div>
           </div>
 
@@ -411,7 +995,7 @@ function toInstant(value) {
             <span v-else></span>
             <button v-if="currentStep < 3" type="button" class="rounded-xl bg-brand-orange px-6 py-3 font-black text-white hover:bg-orange-600" @click="nextStep">Continue</button>
             <button v-else type="button" :disabled="loading" class="rounded-xl bg-brand-orange px-6 py-3 font-black text-white hover:bg-orange-600 disabled:opacity-60" @click="submitEvent">
-              {{ loading ? "Publishing..." : "Confirm & publish" }}
+              {{ loading ? (isEditMode ? "Saving..." : "Publishing...") : (isEditMode ? "Save changes" : "Confirm & publish") }}
             </button>
           </div>
         </main>

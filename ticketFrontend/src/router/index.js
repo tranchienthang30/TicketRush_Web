@@ -6,7 +6,7 @@ const router = createRouter({
   routes: [
     { path: "/", name: "home", component: () => import("@/views/HomeView.vue"), meta: { customerSurface: true } },
     { path: "/events", name: "events", component: () => import("@/views/EventsView.vue"), meta: { customerSurface: true } },
-    { path: "/events/:slug", name: "event-detail", component: () => import("@/views/EventDetailView.vue"), meta: { customerSurface: true } },
+    { path: "/events/:slug", name: "event-detail", component: () => import("@/views/EventDetailView.vue") },
     { path: "/help", name: "help", component: () => import("@/views/HelpCenterView.vue") },
     { path: "/booking", name: "booking", component: () => import("@/views/BookView.vue"), meta: { requiresAuth: true, requiresCustomer: true } },
     { path: "/checkout", name: "checkout", component: () => import("@/views/CheckoutView.vue"), meta: { requiresAuth: true, requiresCustomer: true } },
@@ -29,6 +29,7 @@ const router = createRouter({
     { path: "/provider/home", name: "provider-home", component: () => import("@/views/ProviderHomeView.vue"), meta: { requiresAuth: true, requiresProvider: true } },
     { path: "/provider/dashboard", redirect: "/provider/home" },
     { path: "/create-event", name: "create-event", component: () => import("@/views/CreateEventView.vue"), meta: { requiresAuth: true, requiresProvider: true } },
+    { path: "/events/:id/edit", name: "edit-event", component: () => import("@/views/CreateEventView.vue"), meta: { requiresAuth: true, requiresProvider: true } },
     { path: "/my-events", name: "my-events", component: () => import("@/views/MyEventsView.vue"), meta: { requiresAuth: true, requiresProvider: true } },
     { path: "/admin/dashboard", name: "admin-dashboard", component: () => import("@/views/AdminDashboardView.vue"), meta: { requiresAuth: true, requiresAdmin: true } },
     { path: "/admin/users", name: "admin-users", component: () => import("@/views/AdminUsersView.vue"), meta: { requiresAuth: true, requiresAdmin: true } },
