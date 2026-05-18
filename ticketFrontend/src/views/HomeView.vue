@@ -15,39 +15,6 @@ const fallbackImages = [
   "https://images.unsplash.com/photo-1497032205916-ac775f0649ae?auto=format&fit=crop&w=1400&q=85",
 ];
 
-const promotions = [
-  {
-    title: "Combo Event Night",
-    subtitle: "Selected tickets and perks from 55.000 VND",
-    image: "https://images.unsplash.com/photo-1585647347483-22b66260dfff?auto=format&fit=crop&w=900&q=85",
-  },
-  {
-    title: "Online Booking",
-    subtitle: "Reserve seats faster with TicketRush",
-    image: "https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=900&q=85",
-  },
-  {
-    title: "Special Monday",
-    subtitle: "Selected events from 45.000 VND",
-    image: "https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?auto=format&fit=crop&w=900&q=85",
-  },
-];
-
-const eventHighlights = [
-  {
-    title: "Vietnam Music Week",
-    image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=900&q=85",
-  },
-  {
-    title: "Comedy Showcase",
-    image: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=900&q=85",
-  },
-  {
-    title: "Late Night Classics",
-    image: "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&w=900&q=85",
-  },
-];
-
 async function loadHome() {
   loading.value = true;
   error.value = "";
@@ -79,6 +46,14 @@ function movieTarget(movie) {
 
 function movieMeta(movie) {
   return [movie.category || "Event", movie.date].filter(Boolean).join("   ");
+}
+
+function eventSubtitle(movie) {
+  return [movie.price, movie.date, movie.location].filter(Boolean).slice(0, 2).join(" / ");
+}
+
+function normalizeTag(movie) {
+  return String(movie.tag || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
 }
 
 function formatDuration(minutes) {
@@ -117,6 +92,23 @@ const heroMovies = computed(() => {
 });
 
 const heroMovie = computed(() => heroMovies.value[activeHeroIndex.value] || null);
+
+const promotionEvents = computed(() => {
+  const specialEvents = movies.value.filter((movie) => {
+    const listingType = normalizeListingType(movie);
+    const tag = normalizeTag(movie);
+    return listingType === "SPECIAL" || ["SPECIAL", "SELLING_FAST", "HOT"].includes(tag);
+  });
+
+  const source = specialEvents.length > 0 ? specialEvents : nowShowing.value;
+  return source.slice(0, 3);
+});
+
+const highlightEvents = computed(() => {
+  const promotionIds = new Set(promotionEvents.value.map((movie) => movie.id));
+  const source = movies.value.filter((movie) => !promotionIds.has(movie.id));
+  return (source.length > 0 ? source : movies.value).slice(0, 3);
+});
 
 onMounted(loadHome);
 </script>
@@ -299,39 +291,42 @@ onMounted(loadHome);
           </section>
         </div>
 
-        <aside class="home-sidebar">
-          <section>
+        <aside
+          v-if="promotionEvents.length || highlightEvents.length"
+          class="home-sidebar"
+        >
+          <section v-if="promotionEvents.length">
             <div class="section-head">
               <div>
                 <h2 class="section-title">Khuyến mãi</h2>
                 <div class="section-line"></div>
               </div>
-              <router-link to="/membership" class="section-link">
+              <router-link to="/events" class="section-link">
                 Xem tất cả →
               </router-link>
             </div>
 
             <div class="side-list">
               <router-link
-                v-for="promotion in promotions"
-                :key="promotion.title"
-                to="/membership"
+                v-for="(promotion, index) in promotionEvents"
+                :key="promotion.id"
+                :to="movieTarget(promotion)"
                 class="side-tile side-tile-large"
               >
                 <img
-                  :src="promotion.image"
+                  :src="movieImage(promotion, index + 12)"
                   :alt="promotion.title"
                 />
                 <div class="side-overlay"></div>
                 <div class="side-copy">
                   <p>{{ promotion.title }}</p>
-                  <span>{{ promotion.subtitle }}</span>
+                  <span>{{ eventSubtitle(promotion) }}</span>
                 </div>
               </router-link>
             </div>
           </section>
 
-          <section>
+          <section v-if="highlightEvents.length">
             <div class="section-head">
               <div>
                 <h2 class="section-title">Event highlights</h2>
@@ -344,13 +339,13 @@ onMounted(loadHome);
 
             <div class="side-list">
               <router-link
-                v-for="highlight in eventHighlights"
-                :key="highlight.title"
-                to="/events"
+                v-for="(highlight, index) in highlightEvents"
+                :key="highlight.id"
+                :to="movieTarget(highlight)"
                 class="side-tile"
               >
                 <img
-                  :src="highlight.image"
+                  :src="movieImage(highlight, index + 16)"
                   :alt="highlight.title"
                 />
                 <div class="side-overlay"></div>
