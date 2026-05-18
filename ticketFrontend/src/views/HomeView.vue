@@ -41,11 +41,15 @@ function movieImage(movie, index = 0) {
 }
 
 function movieTarget(movie) {
-  return movie.bookable ? `/booking?eventId=${movie.id}` : "/events";
+  return `/booking?eventId=${movie.id}`;
 }
 
 function movieMeta(movie) {
   return [movie.category || "Event", movie.date].filter(Boolean).join("   ");
+}
+
+function isBookableEvent(movie) {
+  return Boolean(movie?.id && movie?.bookable);
 }
 
 function eventSubtitle(movie) {
@@ -78,36 +82,36 @@ function nextHero() {
 }
 
 const nowShowing = computed(() => {
-  const currentMovies = movies.value.filter((movie) => normalizeListingType(movie) !== "UPCOMING");
-  return (currentMovies.length > 0 ? currentMovies : movies.value).slice(0, 8);
+  return movies.value
+    .filter((movie) => isBookableEvent(movie) && normalizeListingType(movie) !== "UPCOMING")
+    .slice(0, 8);
 });
 
 const upcomingMovies = computed(() =>
-  movies.value.filter((movie) => normalizeListingType(movie) === "UPCOMING").slice(0, 8),
+  movies.value
+    .filter((movie) => isBookableEvent(movie) && normalizeListingType(movie) === "UPCOMING")
+    .slice(0, 8),
 );
 
 const heroMovies = computed(() => {
-  const source = nowShowing.value.length > 0 ? nowShowing.value : movies.value;
-  return source.slice(0, 4);
+  return nowShowing.value.slice(0, 4);
 });
 
 const heroMovie = computed(() => heroMovies.value[activeHeroIndex.value] || null);
 
 const promotionEvents = computed(() => {
-  const specialEvents = movies.value.filter((movie) => {
+  const specialEvents = nowShowing.value.filter((movie) => {
     const listingType = normalizeListingType(movie);
     const tag = normalizeTag(movie);
     return listingType === "SPECIAL" || ["SPECIAL", "SELLING_FAST", "HOT"].includes(tag);
   });
 
-  const source = specialEvents.length > 0 ? specialEvents : nowShowing.value;
-  return source.slice(0, 3);
+  return specialEvents.slice(0, 3);
 });
 
 const highlightEvents = computed(() => {
   const promotionIds = new Set(promotionEvents.value.map((movie) => movie.id));
-  const source = movies.value.filter((movie) => !promotionIds.has(movie.id));
-  return (source.length > 0 ? source : movies.value).slice(0, 3);
+  return nowShowing.value.filter((movie) => !promotionIds.has(movie.id)).slice(0, 3);
 });
 
 onMounted(loadHome);
@@ -115,7 +119,10 @@ onMounted(loadHome);
 
 <template>
   <div class="home-shell">
-    <section class="hero-wrap">
+    <section
+      v-if="heroMovie"
+      class="hero-wrap"
+    >
       <div class="hero-stage">
         <template v-if="heroMovie">
           <img
@@ -143,7 +150,7 @@ onMounted(loadHome);
                 :to="movieTarget(heroMovie)"
                 class="hero-primary"
               >
-                {{ heroMovie.bookable ? "Buy ticket" : "Coming soon" }}
+                Buy ticket
               </router-link>
               <router-link
                 to="/events"
@@ -271,7 +278,7 @@ onMounted(loadHome);
               <router-link
                 v-for="(movie, index) in upcomingMovies"
                 :key="movie.id"
-                to="/events"
+                :to="movieTarget(movie)"
                 class="movie-card"
               >
                 <div class="movie-poster">
