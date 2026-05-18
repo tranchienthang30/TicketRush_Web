@@ -138,7 +138,7 @@ public class ProfileService {
         ProfileQueryRepository.ProfileStatsRow stats = profileRepository.findStats(userId);
         return List.of(
                 new StatResponse("Tickets booked", String.valueOf(stats.ticketsBooked())),
-                new StatResponse("Upcoming movies", String.valueOf(stats.upcomingEvents())),
+                new StatResponse("Upcoming events", String.valueOf(stats.upcomingEvents())),
                 new StatResponse("Savings", formatMoney(stats.savings())),
                 new StatResponse("Total spend", formatMoney(stats.totalSpent()))
         );

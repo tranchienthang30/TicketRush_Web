@@ -14,12 +14,19 @@ public record CreateEventRequest(
         String title,
 
         String description,
+        String genre,
+        String country,
+        String authorName,
+        String directorName,
+        String castMembers,
+        String performerNames,
+        String singerNames,
         String bannerUrl,
 
         @NotNull(message = "Category is required")
         Long categoryId,
 
-        @Min(value = 1, message = "Movie duration must be at least 1 minute")
+        @Min(value = 1, message = "Event duration must be at least 1 minute")
         Integer durationMinutes,
 
         String listingType,

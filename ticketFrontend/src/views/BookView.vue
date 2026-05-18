@@ -238,14 +238,14 @@ async function loadBookingData() {
     }
 
     if (!eventId) {
-      throw new Error("No movie found");
+      throw new Error("No event found");
     }
 
     bookingEvent.value = await getBookingEvent(eventId);
     startTimer();
   } catch {
     bookingEvent.value = null;
-    error.value = "Unable to load seat map. Please check movie/backend data.";
+    error.value = "Unable to load seat map. Please check event/backend data.";
   } finally {
     loading.value = false;
   }
@@ -266,13 +266,13 @@ onUnmounted(() => clearInterval(timerHandle));
               {{ bookingEvent?.title || "Choose Seats" }}
             </h1>
             <p class="mt-2 text-sm text-slate-500">
-              {{ eventDateLabel }} - {{ bookingEvent?.hallName || "Screen Room" }}
+              {{ eventDateLabel }} - {{ bookingEvent?.hallName || "Venue Area" }}
             </p>
           </div>
 
           <div class="grid gap-2 text-right">
             <p class="text-sm font-bold text-slate-700">
-              Showtime: <span class="text-brand-navy">{{ showtimeLabel }}</span>
+              Start time: <span class="text-brand-navy">{{ showtimeLabel }}</span>
             </p>
             <p class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700">
               Seat selection timer: {{ timeoutLabel }}
@@ -301,7 +301,7 @@ onUnmounted(() => clearInterval(timerHandle));
         <div class="rounded-[2rem] border border-slate-200 bg-white px-4 pb-8 pt-6 shadow-sm md:px-8">
           <div class="mx-auto mb-10 max-w-5xl">
             <div class="h-4 rounded-full bg-gradient-to-b from-amber-300 via-amber-200 to-transparent"></div>
-            <p class="mt-3 text-center text-xs font-black uppercase tracking-[0.3em] text-slate-500">Screen</p>
+            <p class="mt-3 text-center text-xs font-black uppercase tracking-[0.3em] text-slate-500">Stage / Venue</p>
           </div>
 
           <div class="overflow-x-auto">

@@ -17,6 +17,16 @@ export async function getEvents(params = {}) {
   return data;
 }
 
+export async function getEventBySlug(slug) {
+  const { data } = await apiClient.get(`/api/events/slug/${slug}`);
+  return data;
+}
+
+export async function getCategories() {
+  const { data } = await apiClient.get("/api/categories");
+  return data;
+}
+
 export async function getBookingEvent(eventId) {
   const { data } = await apiClient.get(`/api/events/${eventId}/booking`);
   return data;

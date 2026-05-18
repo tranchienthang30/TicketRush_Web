@@ -8,6 +8,10 @@ export function getPublicEvents() {
   return apiClient.get("/api/events");
 }
 
+export function getEventBySlug(slug) {
+  return apiClient.get(`/api/events/slug/${slug}`);
+}
+
 export function createEvent(payload) {
   return apiClient.post("/api/events", payload);
 }

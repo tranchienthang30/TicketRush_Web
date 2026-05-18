@@ -37,7 +37,7 @@ onMounted(async () => {
             Quick overview of your created events. Revenue and booking trends can be added here later.
           </p>
         </div>
-        <RouterLink to="/create-movie" class="rounded-xl bg-brand-orange px-5 py-3 text-sm font-black text-white hover:bg-orange-600">
+        <RouterLink to="/create-event" class="rounded-xl bg-brand-orange px-5 py-3 text-sm font-black text-white hover:bg-orange-600">
           Creating
         </RouterLink>
       </div>
@@ -64,7 +64,7 @@ onMounted(async () => {
       <div class="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div class="flex items-center justify-between gap-4">
           <h2 class="text-xl font-black text-brand-navy dark:text-white">Recent events</h2>
-          <RouterLink to="/cinemas-management" class="text-sm font-black text-brand-orange hover:underline">
+          <RouterLink to="/my-events" class="text-sm font-black text-brand-orange hover:underline">
             Managements
           </RouterLink>
         </div>

@@ -14,19 +14,19 @@ const tabDefinitions = [
     id: "NOW_SHOWING",
     label: "Now Showing",
     title: "Now Showing",
-    description: "Current releases playing in cinemas.",
+    description: "Events currently open for booking.",
   },
   {
     id: "UPCOMING",
     label: "Upcoming",
     title: "Upcoming",
-    description: "Premieres and coming soon.",
+    description: "Events opening for booking soon.",
   },
   {
     id: "SPECIAL",
-    label: "Special Showtimes",
-    title: "Special Showtimes",
-    description: "Limited or special event screenings.",
+    label: "Special",
+    title: "Special Events",
+    description: "Limited, VIP, or seasonal ticket drops.",
   },
 ];
 
@@ -38,14 +38,14 @@ async function loadEvents() {
     eventsPage.value = await getEvents({ size: 50 });
     eventsList.value = eventsPage.value?.content || [];
   } catch (err) {
-    error.value = "Could not load movies. Please check the backend API.";
+    error.value = "Could not load events. Please check the backend API.";
   } finally {
     loading.value = false;
   }
 }
 
 function normalizeListingType(event) {
-  const explicitType = event.listingType || event.movieType || event.movieStatus;
+  const explicitType = event.listingType || event.eventType || event.eventStatus;
   const normalized = String(explicitType || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
 
   if (["NOW_SHOWING", "UPCOMING", "SPECIAL"].includes(normalized)) {
@@ -62,11 +62,32 @@ function normalizeListingType(event) {
   return "NOW_SHOWING";
 }
 
+function groupEventsByCategory(events) {
+  const categoryMap = new Map();
+
+  for (const event of events) {
+    const categoryName = event.category || "Other";
+    if (!categoryMap.has(categoryName)) {
+      categoryMap.set(categoryName, []);
+    }
+    categoryMap.get(categoryName).push(event);
+  }
+
+  return Array.from(categoryMap.entries()).map(([name, events]) => ({
+    name,
+    events,
+  }));
+}
+
 const groupedEvents = computed(() =>
-  tabDefinitions.map((tab) => ({
-    ...tab,
-    events: eventsList.value.filter((event) => normalizeListingType(event) === tab.id),
-  })),
+  tabDefinitions.map((tab) => {
+    const tabEvents = eventsList.value.filter((event) => normalizeListingType(event) === tab.id);
+    return {
+      ...tab,
+      events: tabEvents,
+      categories: groupEventsByCategory(tabEvents),
+    };
+  }),
 );
 
 const activeGroup = computed(
@@ -80,10 +101,10 @@ onMounted(loadEvents);
   <div class="bg-brand-light dark:bg-slate-900 min-h-screen pb-20">
     <div class="bg-brand-navy py-16 px-4 text-center text-white mb-12 shadow-inner">
       <h1 class="text-4xl md:text-5xl text-brand-orange mb-4 uppercase tracking-tighter font-black">
-        Now Showing
+        Events
       </h1>
       <p class="text-blue-100 max-w-2xl mx-auto text-lg">
-        Browse movie genres, compare showtimes, and pick your next cinema night.
+        Browse tickets by section, then by category: Music, Show, Concert, Cinema, Sport, Festival, and more.
       </p>
     </div>
 
@@ -108,7 +129,7 @@ onMounted(loadEvents);
         v-if="loading"
         class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
       >
-        Loading movies...
+        Loading events...
       </div>
 
       <div
@@ -122,7 +143,7 @@ onMounted(loadEvents);
         v-else-if="eventsList.length === 0"
         class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
       >
-        No published movies are available yet.
+        No published events are available yet.
       </div>
 
       <template v-else>
@@ -132,11 +153,32 @@ onMounted(loadEvents);
               <h2 class="text-3xl font-black text-brand-navy dark:text-white tracking-tight">{{ activeGroup.title }}</h2>
               <p class="text-gray-500 dark:text-gray-400">{{ activeGroup.description }}</p>
             </div>
-            <div class="text-sm text-gray-600 dark:text-slate-300 font-bold">{{ activeGroup.events.length }} Movies</div>
+            <div class="text-sm text-gray-600 dark:text-slate-300 font-bold">{{ activeGroup.events.length }} Events</div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            <EventCard v-for="event in activeGroup.events" :key="event.id" :event="event" />
+          <div class="space-y-12">
+            <section
+              v-for="categoryGroup in activeGroup.categories"
+              :key="categoryGroup.name"
+            >
+              <div class="mb-5 flex items-center justify-between border-b border-slate-200 pb-3 dark:border-slate-700">
+                <div>
+                  <h3 class="text-2xl font-black uppercase tracking-tight text-brand-navy dark:text-white">
+                    {{ categoryGroup.name }}
+                  </h3>
+                  <p class="text-sm font-bold text-slate-500 dark:text-slate-300">
+                    {{ categoryGroup.events.length }} events
+                  </p>
+                </div>
+                <span class="rounded-full bg-brand-orange/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-brand-orange">
+                  {{ categoryGroup.name }}
+                </span>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                <EventCard v-for="event in categoryGroup.events" :key="event.id" :event="event" />
+              </div>
+            </section>
           </div>
         </section>
 
@@ -144,7 +186,7 @@ onMounted(loadEvents);
           v-else
           class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 text-center font-bold text-slate-500 dark:text-slate-300"
         >
-          No movies in this section yet.
+          No events in this section yet.
         </div>
       </template>
     </div>

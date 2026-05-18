@@ -54,6 +54,25 @@ public class Event {
 
     private String description;
 
+    private String genre;
+
+    private String country;
+
+    @Column(name = "author_name")
+    private String authorName;
+
+    @Column(name = "director_name")
+    private String directorName;
+
+    @Column(name = "cast_members")
+    private String castMembers;
+
+    @Column(name = "performer_names")
+    private String performerNames;
+
+    @Column(name = "singer_names")
+    private String singerNames;
+
     @Column(name = "banner_url")
     private String bannerUrl;
 

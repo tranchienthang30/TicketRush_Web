@@ -3,21 +3,21 @@ import { ref } from "vue";
 
 const helpCategories = ref([
   {
-    id: "movies",
-    title: "Movies & Showtimes",
+    id: "events",
+    title: "Events & Tickets",
     icon: "01",
     articles: [
       {
         id: "m1",
-        title: "How to find a events?",
+        title: "How to find an event?",
         content:
-          '<p class="mb-4">Open the <strong>Events</strong> page from the top menu to browse films by genre. You can also use the search bar to look for a title, cinema, or city.</p><p>Movie data is refreshed from the backend API.</p>',
+          '<p class="mb-4">Open the <strong>Events</strong> page from the top menu to browse tickets by category such as Music, Show, Concert, Cinema, Sport, Festival, Theater, and Workshop.</p><p>Event data is refreshed from the backend API.</p>',
       },
       {
         id: "m2",
         title: "How to book seats",
         content:
-          '<p class="mb-4">Choose a movie, open the booking page, select available seats on the cinema map, then continue to checkout.</p><ul class="list-disc pl-6 space-y-2"><li>Step 1: Choose movie</li><li>Step 2: Pick seats</li><li>Step 3: Pay and receive tickets</li></ul>',
+          '<p class="mb-4">Choose an event, open the booking page, select available seats, then continue to checkout.</p><ul class="list-disc pl-6 space-y-2"><li>Step 1: Choose event</li><li>Step 2: Pick seats or ticket areas</li><li>Step 3: Pay and receive tickets</li></ul>',
       },
     ],
   },
@@ -30,13 +30,13 @@ const helpCategories = ref([
         id: "a1",
         title: "Where are my tickets?",
         content:
-          "<p>All purchased movie tickets are stored in <strong>My Tickets</strong>. Open a ticket to view seat details and the QR code for check-in.</p>",
+          "<p>All purchased tickets are stored in <strong>My Tickets</strong>. Open a ticket to view seat details and the QR code for check-in.</p>",
       },
       {
         id: "a2",
         title: "Membership benefits",
         content:
-          "<p>Membership perks can apply discounts, early screening access, and faster support depending on the active plan.</p>",
+          "<p>Membership perks can apply discounts, early access, and faster support depending on the active plan.</p>",
       },
     ],
   },
@@ -55,13 +55,13 @@ const helpCategories = ref([
         id: "p2",
         title: "Refund policy",
         content:
-          "<p>Movie tickets are generally non-refundable unless a screening is canceled or rescheduled by the cinema. Please check the terms shown during checkout.</p>",
+          "<p>Tickets are generally non-refundable unless an event is canceled or rescheduled by the organizer. Please check the terms shown during checkout.</p>",
       },
     ],
   },
 ]);
 
-const expandedCategory = ref("movies");
+const expandedCategory = ref("events");
 const activeArticle = ref(helpCategories.value[0].articles[0]);
 
 const toggleCategory = (categoryId) => {
@@ -81,7 +81,7 @@ const selectArticle = (article) => {
       <div class="max-w-2xl mx-auto relative">
         <input
           type="text"
-          placeholder="Search movie booking help..."
+          placeholder="Search event booking help..."
           class="w-full px-6 py-4 rounded-full text-lg shadow-lg focus:outline-none focus:ring-4 focus:ring-brand-orange/50"
         />
         <button class="absolute right-3 top-2.5 bg-brand-orange text-white p-2.5 rounded-full hover:bg-orange-500 transition">

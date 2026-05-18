@@ -44,9 +44,9 @@ const benefitSteps = [
       "Earn points on every order and convert them into credits or upgrades.",
   },
   {
-    title: "Stay movie-ready",
+    title: "Stay event-ready",
     description:
-      "Keep movie tickets, ticket history, and membership perks in one profile hub.",
+      "Keep event tickets, ticket history, and membership perks in one profile hub.",
   },
 ];
 
@@ -59,9 +59,9 @@ const faqs = [
   },
   {
     id: 2,
-    question: "Do perks apply to every movie on the platform?",
+    question: "Do perks apply to every event on the platform?",
     answer:
-      "Most Starlight Cinema showtimes are included. Some special screenings may have different terms listed on the movie page.",
+      "Most TicketRush-hosted events are included. Some partner-specific tickets may have different terms listed on the event page.",
   },
   {
     id: 3,
@@ -143,7 +143,7 @@ onMounted(loadMembership);
               Membership
             </p>
             <h1 class="text-4xl md:text-6xl font-black tracking-tight leading-none max-w-3xl">
-              Book smarter, move faster, and get more from every movie night.
+              Book smarter, move faster, and get more from every event night.
             </h1>
             <p class="mt-6 max-w-2xl text-base md:text-lg text-blue-100 leading-relaxed">
               TicketRush Membership keeps your best perks in one place, from
@@ -215,7 +215,7 @@ onMounted(loadMembership);
             Plans
           </p>
           <h2 class="mt-3 text-3xl md:text-4xl font-black text-brand-navy dark:text-white">
-            Choose the rhythm that fits your movie life.
+            Choose the rhythm that fits your event life.
           </h2>
         </div>
         <p class="max-w-xl text-sm leading-7 text-slate-500 dark:text-slate-300">
@@ -316,7 +316,7 @@ onMounted(loadMembership);
             <p class="mt-4 text-sm leading-7 text-slate-500 dark:text-slate-300">
               When queues get busy, small advantages matter. Membership keeps
               your checkout details ready, preserves your rewards history, and
-              opens doors to screenings that sell out quickly.
+              opens doors to events that sell out quickly.
             </p>
           </div>
 

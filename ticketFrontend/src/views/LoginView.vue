@@ -46,7 +46,7 @@ async function handleLogin() {
           Welcome back
         </h1>
         <p class="text-gray-500 dark:text-gray-400 mt-2">
-          Sign in to book movie seats and manage your tickets.
+          Sign in to book event tickets and manage your orders.
         </p>
       </div>
 

@@ -193,7 +193,7 @@ onUnmounted(() => {
           </h2>
 
           <div class="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-            <p>Cinema: {{ ticket.location }}</p>
+            <p>Venue: {{ ticket.location }}</p>
             <p>Seat: {{ ticket.seat }}</p>
             <p>Ticket code: <span class="font-bold text-slate-700 dark:text-slate-100">{{ ticketIdentity(ticket) }}</span></p>
           </div>
@@ -267,7 +267,7 @@ onUnmounted(() => {
                 <span class="font-bold text-slate-800 dark:text-white">{{ selectedTicketDetail.displayTotal }}</span>
               </p>
               <p>
-                Showtime:
+                Event time:
                 <span class="font-bold text-slate-800 dark:text-white">{{ selectedTicketDetail.date }}</span>
               </p>
             </div>

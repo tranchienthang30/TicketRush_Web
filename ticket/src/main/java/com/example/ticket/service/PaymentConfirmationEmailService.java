@@ -85,7 +85,7 @@ public class PaymentConfirmationEmailService {
                                   <td style="padding:12px 16px;color:#0f172a;font-weight:700;">%s</td>
                                 </tr>
                                 <tr>
-                                  <td style="background:#f8fafc;padding:12px 16px;font-weight:700;color:#475569;">Movie/Event</td>
+                                  <td style="background:#f8fafc;padding:12px 16px;font-weight:700;color:#475569;">Event</td>
                                   <td style="padding:12px 16px;color:#0f172a;">%s</td>
                                 </tr>
                                 <tr>

@@ -389,7 +389,7 @@ onMounted(async () => {
                 <p
                   class="text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300"
                 >
-                  Movie
+                  Event
                 </p>
                 <p class="mt-2 text-lg font-black text-brand-navy dark:text-white">
                   {{ summary.eventTitle }}

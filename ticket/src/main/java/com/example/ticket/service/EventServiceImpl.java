@@ -104,6 +104,13 @@ public class EventServiceImpl implements EventService {
                 .title(request.title().trim())
                 .slug(uniqueSlug(request.title()))
                 .description(blankToNull(request.description()))
+                .genre(blankToNull(request.genre()))
+                .country(blankToNull(request.country()))
+                .authorName(blankToNull(request.authorName()))
+                .directorName(blankToNull(request.directorName()))
+                .castMembers(blankToNull(request.castMembers()))
+                .performerNames(blankToNull(request.performerNames()))
+                .singerNames(blankToNull(request.singerNames()))
                 .bannerUrl(blankToNull(request.bannerUrl()))
                 .durationMinutes(resolveDurationMinutes(request))
                 .listingType(normalizeListingType(request.listingType()))
@@ -205,7 +212,7 @@ public class EventServiceImpl implements EventService {
     @Transactional(readOnly = true)
     public BookingEventResponse getBookingEvent(UUID eventId) {
         EventQueryRepository.BookingEventRow event = eventQueryRepository.findPublishedEventForBooking(eventId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Movie not found"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
 
         List<EventQueryRepository.BookingSectionRow> sections = eventQueryRepository.findSectionsByEvent(eventId);
         Map<UUID, List<BookingSeatResponse>> seatsBySection = eventQueryRepository.findSeatsByEvent(eventId).stream()
@@ -439,7 +446,7 @@ public class EventServiceImpl implements EventService {
         String normalized = listingType.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
         return switch (normalized) {
             case "NOW_SHOWING", "UPCOMING", "SPECIAL" -> normalized;
-            default -> throw new AppException(HttpStatus.BAD_REQUEST, "Movie listing type is invalid");
+            default -> throw new AppException(HttpStatus.BAD_REQUEST, "Event listing type is invalid");
         };
     }
 

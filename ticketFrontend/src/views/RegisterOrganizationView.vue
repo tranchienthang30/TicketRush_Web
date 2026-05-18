@@ -40,7 +40,7 @@ async function submit() {
     <div class="max-w-xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 p-8">
       <h1 class="text-3xl font-black text-brand-navy dark:text-white mb-2">Register provider profile</h1>
       <p class="text-slate-500 dark:text-slate-400 mb-8">
-        Verify a business email to become a provider and manage movies/showtimes for the system.
+        Verify a business email to become a provider and manage events for the system.
       </p>
 
       <form class="space-y-5" @submit.prevent="submit">

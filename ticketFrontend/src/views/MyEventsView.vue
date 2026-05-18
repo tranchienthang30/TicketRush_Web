@@ -43,7 +43,7 @@ function formatListingType(type) {
   <div class="max-w-6xl mx-auto p-6">
     <div class="flex items-center justify-between gap-4 mb-6">
       <h1 class="text-3xl font-black text-brand-navy dark:text-white">Managements</h1>
-      <RouterLink to="/create-movie" class="rounded-xl bg-brand-orange px-5 py-3 font-black text-white hover:bg-orange-600">
+      <RouterLink to="/create-event" class="rounded-xl bg-brand-orange px-5 py-3 font-black text-white hover:bg-orange-600">
         Create Event
       </RouterLink>
     </div>

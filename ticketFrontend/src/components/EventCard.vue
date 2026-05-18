@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from "vue";
+import { useRouter } from "vue-router";
 
 const props = defineProps({
   event: {
@@ -7,6 +8,8 @@ const props = defineProps({
     required: true,
   },
 });
+
+const router = useRouter();
 
 const fallbackImages = [
   "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=700&q=80",
@@ -56,15 +59,34 @@ const canBook = computed(() => {
   const listingType = String(props.event.listingType || "").toUpperCase();
   return listingType !== "UPCOMING" && props.event.tag !== "Coming Soon" && props.event.tag !== "Sold Out";
 });
+
+const detailPath = computed(() => (props.event.slug ? `/events/${props.event.slug}` : "/events"));
+
+function openDetail() {
+  router.push(detailPath.value);
+}
+
+function openDetailFromKeyboard(event) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    openDetail();
+  }
+}
 </script>
 
 <template>
-  <div class="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-md hover:-translate-y-2 transition-transform duration-300 group cursor-pointer border border-gray-100 dark:border-slate-700">
+  <div
+    class="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-md hover:-translate-y-2 transition-transform duration-300 group cursor-pointer border border-gray-100 dark:border-slate-700"
+    role="link"
+    tabindex="0"
+    @click="openDetail"
+    @keydown="openDetailFromKeyboard"
+  >
     <div class="relative h-64 overflow-hidden bg-slate-200 flex items-center justify-center text-gray-400">
       <img
         :src="imageSrc"
         class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        alt="Movie poster"
+        alt="Event cover"
       />
 
       <!-- left tag (e.g., HOT, P) -->
@@ -87,7 +109,7 @@ const canBook = computed(() => {
       </h4>
 
       <div class="text-sm text-gray-500 dark:text-slate-400 mb-3 flex items-center gap-3">
-        <span class="inline-block">Genre: {{ event.category || 'Movie' }}</span>
+        <span class="inline-block">Category: {{ event.category || 'Event' }}</span>
         <span class="inline-block">/</span>
         <span class="inline-block">Duration: {{ durationText }}</span>
       </div>
@@ -99,6 +121,7 @@ const canBook = computed(() => {
           v-if="canBook"
           :to="`/booking?eventId=${event.id}`"
           class="bg-brand-navy text-white px-4 py-2 rounded-lg hover:bg-brand-orange transition-all font-bold shadow-md active:scale-95"
+          @click.stop
         >
           BUY TICKET
         </router-link>

@@ -17,8 +17,8 @@ const fallbackImages = [
 
 const promotions = [
   {
-    title: "Combo Movie Night",
-    subtitle: "Popcorn + drink from 55.000 VND",
+    title: "Combo Event Night",
+    subtitle: "Selected tickets and perks from 55.000 VND",
     image: "https://images.unsplash.com/photo-1585647347483-22b66260dfff?auto=format&fit=crop&w=900&q=85",
   },
   {
@@ -28,18 +28,18 @@ const promotions = [
   },
   {
     title: "Special Monday",
-    subtitle: "Selected 2D shows from 45.000 VND",
+    subtitle: "Selected events from 45.000 VND",
     image: "https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?auto=format&fit=crop&w=900&q=85",
   },
 ];
 
 const eventHighlights = [
   {
-    title: "Vietnam Cinema Week",
+    title: "Vietnam Music Week",
     image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=900&q=85",
   },
   {
-    title: "Director Talk",
+    title: "Comedy Showcase",
     image: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=900&q=85",
   },
   {
@@ -56,7 +56,7 @@ async function loadHome() {
     const data = await getEvents({ size: 24 });
     movies.value = data.content || [];
   } catch (err) {
-    error.value = "Could not load featured movies. Please check the backend API.";
+    error.value = "Could not load featured events. Please check the backend API.";
   } finally {
     loading.value = false;
   }
@@ -78,7 +78,7 @@ function movieTarget(movie) {
 }
 
 function movieMeta(movie) {
-  return [movie.category || "Movie", movie.date].filter(Boolean).join("   ");
+  return [movie.category || "Event", movie.date].filter(Boolean).join("   ");
 }
 
 function formatDuration(minutes) {
@@ -142,7 +142,7 @@ onMounted(loadHome);
               {{ heroMovie.title }}
             </h1>
             <p class="hero-meta">
-              {{ heroMovie.category || "Movie" }}
+              {{ heroMovie.category || "Event" }}
               <span v-if="formatDuration(heroMovie.durationMinutes)"> / {{ formatDuration(heroMovie.durationMinutes) }}</span>
               <span v-if="heroMovie.date"> / {{ heroMovie.date }}</span>
             </p>
@@ -151,13 +151,13 @@ onMounted(loadHome);
                 :to="movieTarget(heroMovie)"
                 class="hero-primary"
               >
-                {{ heroMovie.bookable ? "Mua vé ngay" : "Sắp chiếu" }}
+                {{ heroMovie.bookable ? "Buy ticket" : "Coming soon" }}
               </router-link>
               <router-link
                 to="/events"
                 class="hero-secondary"
               >
-                Lịch chiếu
+                All events
               </router-link>
             </div>
           </div>
@@ -205,7 +205,7 @@ onMounted(loadHome);
         v-if="loading"
         class="home-state"
       >
-        Loading featured movies...
+        Loading featured events...
       </div>
 
       <div
@@ -222,7 +222,7 @@ onMounted(loadHome);
               <div>
                 <h2 class="section-title">
                   <span class="section-dot"></span>
-                  Phim đang chiếu
+                  Available now
                 </h2>
                 <div class="section-line"></div>
               </div>
@@ -235,7 +235,7 @@ onMounted(loadHome);
               v-if="nowShowing.length === 0"
               class="home-state"
             >
-              No featured movies are available yet.
+              No featured events are available yet.
             </div>
 
             <div v-else class="movie-grid">
@@ -266,7 +266,7 @@ onMounted(loadHome);
               <div>
                 <h2 class="section-title">
                   <span class="section-dot"></span>
-                  Phim sắp chiếu
+                  Upcoming events
                 </h2>
                 <div class="section-line"></div>
               </div>
@@ -334,7 +334,7 @@ onMounted(loadHome);
           <section>
             <div class="section-head">
               <div>
-                <h2 class="section-title">Sự kiện</h2>
+                <h2 class="section-title">Event highlights</h2>
                 <div class="section-line"></div>
               </div>
               <router-link to="/events" class="section-link">

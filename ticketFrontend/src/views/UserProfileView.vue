@@ -60,8 +60,8 @@ async function resendVerification() {
       >
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p class="font-black text-slate-900 dark:text-white">Want to create movies?</p>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Register a provider profile with a business email to manage movies and showtimes.</p>
+            <p class="font-black text-slate-900 dark:text-white">Want to create events?</p>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Register a provider profile with a business email to manage event listings.</p>
           </div>
           <RouterLink
             to="/provider/register"

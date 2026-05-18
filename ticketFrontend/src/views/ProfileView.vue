@@ -296,7 +296,7 @@ onMounted(loadDashboard);
 
               <router-link
                 v-else-if="profile.role === 'PROVIDER'"
-                to="/create-movie"
+                to="/create-event"
                 class="mt-6 inline-flex rounded-2xl bg-brand-orange px-5 py-3 text-sm font-black uppercase tracking-[0.18em] text-white transition hover:bg-orange-600"
               >
                 Creating
@@ -321,7 +321,7 @@ onMounted(loadDashboard);
                   to="/events"
                   class="text-sm font-black uppercase tracking-[0.18em] text-brand-orange hover:underline"
                 >
-                  Explore more movies
+                  Explore more events
                 </router-link>
               </div>
 

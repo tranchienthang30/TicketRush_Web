@@ -17,6 +17,13 @@ const message = ref("");
 const form = reactive({
   title: "",
   description: "",
+  genre: "",
+  country: "",
+  authorName: "",
+  directorName: "",
+  castMembers: "",
+  performerNames: "",
+  singerNames: "",
   bannerUrl: "",
   categoryId: "",
   durationMinutes: 120,
@@ -84,7 +91,7 @@ function removeSection(index) {
 function nextStep() {
   error.value = "";
   if (currentStep.value === 1 && !isStepOneValid()) {
-    error.value = "Please complete movie information before continuing.";
+    error.value = "Please complete event information before continuing.";
     return;
   }
   if (currentStep.value === 2 && !isStepTwoValid()) {
@@ -111,7 +118,7 @@ async function submitEvent() {
     const response = await eventApi.createEvent(toPayload());
     router.push(`/events?created=${response.data.slug}`);
   } catch (err) {
-    error.value = err.response?.data?.message || "Unable to create movie.";
+    error.value = err.response?.data?.message || "Unable to create event.";
   } finally {
     loading.value = false;
   }
@@ -142,6 +149,13 @@ function toPayload() {
   return {
     title: form.title,
     description: form.description || null,
+    genre: form.genre || null,
+    country: form.country || null,
+    authorName: form.authorName || null,
+    directorName: form.directorName || null,
+    castMembers: form.castMembers || null,
+    performerNames: form.performerNames || null,
+    singerNames: form.singerNames || null,
     bannerUrl: form.bannerUrl || null,
     categoryId: Number(form.categoryId),
     durationMinutes: Number(form.durationMinutes),
@@ -209,10 +223,10 @@ function toInstant(value) {
 
       <div v-else class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
         <aside class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 h-fit sticky top-32">
-          <h2 class="font-black text-brand-navy dark:text-white mb-5">Create movie</h2>
+          <h2 class="font-black text-brand-navy dark:text-white mb-5">Create event</h2>
           <ol class="space-y-3">
             <li v-for="step in [
-              { id: 1, label: 'Movie information' },
+              { id: 1, label: 'Event information' },
               { id: 2, label: 'Seat setup' },
               { id: 3, label: 'Payment & confirmation' }
             ]" :key="step.id" class="flex items-center gap-3">
@@ -238,7 +252,7 @@ function toInstant(value) {
           <p v-if="error" class="mb-5 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">{{ error }}</p>
 
           <div v-if="currentStep === 1" class="space-y-5">
-            <h2 class="text-xl font-black text-slate-900 dark:text-white">Movie information</h2>
+            <h2 class="text-xl font-black text-slate-900 dark:text-white">Event information</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
               <label class="block md:col-span-2">
                 <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Title</span>
@@ -253,6 +267,34 @@ function toInstant(value) {
                 <input v-model.trim="form.bannerUrl" placeholder="https://..." class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
               </label>
               <label class="block">
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Genre</span>
+                <input v-model.trim="form.genre" placeholder="Pop concert, comedy, animation..." class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+              </label>
+              <label class="block">
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Country</span>
+                <input v-model.trim="form.country" placeholder="Vietnam, Japan, South Korea..." class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+              </label>
+              <label class="block">
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Author / creator</span>
+                <input v-model.trim="form.authorName" placeholder="Writer, creator, organizer..." class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+              </label>
+              <label class="block">
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Director</span>
+                <input v-model.trim="form.directorName" placeholder="Director, stage director..." class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+              </label>
+              <label class="block md:col-span-2">
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Cast / speakers</span>
+                <input v-model.trim="form.castMembers" placeholder="Actors, speakers, teams..." class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+              </label>
+              <label class="block">
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Performers</span>
+                <input v-model.trim="form.performerNames" placeholder="Band, dance crew, host..." class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+              </label>
+              <label class="block">
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Singers</span>
+                <input v-model.trim="form.singerNames" placeholder="Singer, vocalist..." class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
+              </label>
+              <label class="block">
                 <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Category</span>
                 <select v-model="form.categoryId" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                   <option value="">Select category</option>
@@ -264,7 +306,7 @@ function toInstant(value) {
                 <input v-model.number="form.durationMinutes" type="number" min="1" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
               </label>
               <label class="block">
-                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Movie section</span>
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Event section</span>
                 <select v-model="form.listingType" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
                   <option value="NOW_SHOWING">Now Showing</option>
                   <option value="UPCOMING">Upcoming</option>
@@ -360,7 +402,7 @@ function toInstant(value) {
             </div>
             <label class="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
               <input v-model="form.termsAccepted" type="checkbox" class="mt-1" />
-              <span class="text-sm text-slate-600 dark:text-slate-300">I confirm the movie information is accurate and accept TicketRush provider terms. This MVP will publish the movie immediately; admin approval will be added later.</span>
+              <span class="text-sm text-slate-600 dark:text-slate-300">I confirm the event information is accurate and accept TicketRush provider terms. This MVP will publish the event immediately; admin approval will be added later.</span>
             </label>
           </div>
 

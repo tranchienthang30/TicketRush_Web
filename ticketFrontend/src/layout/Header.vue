@@ -47,8 +47,8 @@ const visibleNavItems = computed(() => {
   if (isProvider.value) {
     return [
       { name: "Home", path: "/provider/home" },
-      { name: "Creating", path: "/create-movie" },
-      { name: "Managements", path: "/cinemas-management" },
+      { name: "Create Event", path: "/create-event" },
+      { name: "Manage Events", path: "/my-events" },
       { name: "Help Center", path: "/help" },
     ];
   }
@@ -97,7 +97,7 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
       <div class="hidden md:flex flex-1 mx-10">
         <input
           type="text"
-          placeholder="Movies..."
+          placeholder="Events..."
           class="w-full max-w-md px-5 py-2 rounded-full text-slate-900 focus:outline-none focus:ring-4 focus:ring-brand-orange/50 transition-all text-base"
         />
       </div>
@@ -222,16 +222,16 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
 
             <router-link
               v-if="isProvider"
-              to="/create-movie"
+              to="/create-event"
               class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
               @click="showProfileMenu = false"
             >
-              Creating
+              Create Event
             </router-link>
 
             <router-link
               v-if="isProvider"
-              to="/cinemas-management"
+              to="/my-events"
               class="block px-4 py-3 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
               @click="showProfileMenu = false"
             >
