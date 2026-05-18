@@ -52,20 +52,40 @@ public class CheckoutQueryRepository {
                     es.event_id,
                     es.seat_code,
                     es.price,
-                    es.status::text AS status
+                    es.status::text AS status,
+                    es.locked_by,
+                    es.lock_expires_at
                 FROM event_seats es
                 WHERE es.id IN (:seatIds)
                 """;
 
         return jdbcTemplate.query(sql,
                 new MapSqlParameterSource("seatIds", seatIds),
-                (rs, rowNum) -> new SeatCheckoutRow(
-                        rs.getObject("id", UUID.class),
-                        rs.getObject("event_id", UUID.class),
-                        rs.getString("seat_code"),
-                        rs.getBigDecimal("price"),
-                        rs.getString("status")
-                ));
+                this::mapSeatCheckoutRow);
+    }
+
+    public List<SeatCheckoutRow> findSeatsByIdsForUpdate(List<UUID> seatIds) {
+        if (seatIds == null || seatIds.isEmpty()) {
+            return List.of();
+        }
+
+        String sql = """
+                SELECT
+                    es.id,
+                    es.event_id,
+                    es.seat_code,
+                    es.price,
+                    es.status::text AS status,
+                    es.locked_by,
+                    es.lock_expires_at
+                FROM event_seats es
+                WHERE es.id IN (:seatIds)
+                FOR UPDATE
+                """;
+
+        return jdbcTemplate.query(sql,
+                new MapSqlParameterSource("seatIds", seatIds),
+                this::mapSeatCheckoutRow);
     }
 
     public Optional<BigDecimal> findActiveMembershipDiscount(UUID userId) {
@@ -129,22 +149,97 @@ public class CheckoutQueryRepository {
         return exists != null && exists;
     }
 
-    public int markSeatSold(UUID seatId, UUID eventId) {
+    public int setSeatLocks(UUID userId, UUID eventId, List<UUID> seatIds, OffsetDateTime lockExpiresAt) {
+        if (seatIds == null || seatIds.isEmpty()) {
+            return 0;
+        }
+
         String sql = """
                 UPDATE event_seats
-                SET status = 'SOLD',
+                SET status = 'LOCKED',
+                    locked_by = :userId,
+                    lock_expires_at = :lockExpiresAt,
+                    version = version + 1,
+                    updated_at = now()
+                WHERE event_id = :eventId
+                AND id IN (:seatIds)
+                AND status IN ('AVAILABLE', 'LOCKED')
+                """;
+
+        return jdbcTemplate.update(sql, new MapSqlParameterSource()
+                .addValue("userId", userId)
+                .addValue("eventId", eventId)
+                .addValue("seatIds", seatIds)
+                .addValue("lockExpiresAt", lockExpiresAt));
+    }
+
+    public int releaseSeatLocksForUser(UUID userId, UUID eventId, List<UUID> seatIds) {
+        if (seatIds == null || seatIds.isEmpty()) {
+            return 0;
+        }
+
+        String sql = """
+                UPDATE event_seats
+                SET status = 'AVAILABLE',
                     locked_by = NULL,
                     lock_expires_at = NULL,
                     version = version + 1,
                     updated_at = now()
-                WHERE id = :seatId
-                AND event_id = :eventId
-                AND status = 'AVAILABLE'
+                WHERE event_id = :eventId
+                AND id IN (:seatIds)
+                AND status = 'LOCKED'
+                AND locked_by = :userId
                 """;
 
         return jdbcTemplate.update(sql, new MapSqlParameterSource()
-                .addValue("seatId", seatId)
-                .addValue("eventId", eventId));
+                .addValue("userId", userId)
+                .addValue("eventId", eventId)
+                .addValue("seatIds", seatIds));
+    }
+
+    public int releaseExpiredSeatLocks(OffsetDateTime now) {
+        String sql = """
+                UPDATE event_seats
+                SET status = 'AVAILABLE',
+                    locked_by = NULL,
+                    lock_expires_at = NULL,
+                    version = version + 1,
+                    updated_at = now()
+                WHERE status = 'LOCKED'
+                AND lock_expires_at IS NOT NULL
+                AND lock_expires_at <= :now
+                """;
+
+        return jdbcTemplate.update(sql, new MapSqlParameterSource("now", now));
+    }
+
+    public int markOrderSeatsSold(UUID orderId) {
+        String sql = """
+                UPDATE event_seats es
+                SET status = 'SOLD',
+                    locked_by = NULL,
+                    lock_expires_at = NULL,
+                    version = es.version + 1,
+                    updated_at = now()
+                FROM order_items oi
+                WHERE oi.order_id = :orderId
+                AND oi.event_seat_id = es.id
+                """;
+
+        return jdbcTemplate.update(sql, new MapSqlParameterSource("orderId", orderId));
+    }
+
+    public int expirePendingOrders(OffsetDateTime now) {
+        String sql = """
+                UPDATE orders
+                SET status = 'EXPIRED',
+                    cancelled_at = :now
+                WHERE status = 'PENDING'
+                AND expires_at IS NOT NULL
+                AND expires_at <= :now
+                """;
+
+        return jdbcTemplate.update(sql, new MapSqlParameterSource("now", now));
     }
 
     public void insertOrder(
@@ -438,6 +533,18 @@ public class CheckoutQueryRepository {
         );
     }
 
+    private SeatCheckoutRow mapSeatCheckoutRow(ResultSet rs, int rowNum) throws SQLException {
+        return new SeatCheckoutRow(
+                rs.getObject("id", UUID.class),
+                rs.getObject("event_id", UUID.class),
+                rs.getString("seat_code"),
+                rs.getBigDecimal("price"),
+                rs.getString("status"),
+                rs.getObject("locked_by", UUID.class),
+                rs.getObject("lock_expires_at", OffsetDateTime.class)
+        );
+    }
+
     public record EventCheckoutRow(
             UUID id,
             String title,
@@ -450,7 +557,9 @@ public class CheckoutQueryRepository {
             UUID eventId,
             String seatCode,
             BigDecimal price,
-            String status
+            String status,
+            UUID lockedBy,
+            OffsetDateTime lockExpiresAt
     ) {
     }
 

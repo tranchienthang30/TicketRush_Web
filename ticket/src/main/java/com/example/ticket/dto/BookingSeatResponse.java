@@ -1,6 +1,7 @@
 package com.example.ticket.dto;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 public record BookingSeatResponse(
@@ -15,6 +16,9 @@ public record BookingSeatResponse(
         Integer layoutX,
         Integer layoutY,
         boolean hidden,
-        boolean accessible
+        boolean accessible,
+        OffsetDateTime lockExpiresAt,
+        UUID lockOwnerUserId,
+        boolean lockedByCurrentUser
 ) {
 }

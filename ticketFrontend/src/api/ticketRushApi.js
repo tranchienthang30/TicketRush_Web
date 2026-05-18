@@ -32,6 +32,16 @@ export async function getBookingEvent(eventId) {
   return data;
 }
 
+export async function lockBookingSeats(payload) {
+  const { data } = await apiClient.post("/api/me/checkout/seats/lock", payload);
+  return data;
+}
+
+export async function releaseBookingSeats(payload) {
+  const { data } = await apiClient.post("/api/me/checkout/seats/release", payload);
+  return data;
+}
+
 export async function getMembershipPlans() {
   const { data } = await apiClient.get("/api/membership/plans");
   return data;

@@ -5,6 +5,8 @@ import com.example.ticket.dto.CheckoutPreviewRequest;
 import com.example.ticket.dto.CheckoutResultResponse;
 import com.example.ticket.dto.CheckoutSummaryResponse;
 import com.example.ticket.dto.ApiMessageResponse;
+import com.example.ticket.dto.SeatLockRequest;
+import com.example.ticket.dto.SeatLockResponse;
 import com.example.ticket.service.CheckoutService;
 import com.example.ticket.service.CurrentUserService;
 import jakarta.validation.Valid;
@@ -34,6 +36,22 @@ public class CheckoutController {
             @Valid @RequestBody CheckoutPreviewRequest request
     ) {
         return checkoutService.preview(currentUserService.resolve(userId), request);
+    }
+
+    @PostMapping("/seats/lock")
+    public SeatLockResponse lockSeats(
+            @RequestHeader(name = "X-User-Id", required = false) UUID userId,
+            @Valid @RequestBody SeatLockRequest request
+    ) {
+        return checkoutService.lockSeats(currentUserService.resolve(userId), request);
+    }
+
+    @PostMapping("/seats/release")
+    public SeatLockResponse releaseSeats(
+            @RequestHeader(name = "X-User-Id", required = false) UUID userId,
+            @Valid @RequestBody SeatLockRequest request
+    ) {
+        return checkoutService.releaseSeats(currentUserService.resolve(userId), request);
     }
 
     @PostMapping("/confirm")

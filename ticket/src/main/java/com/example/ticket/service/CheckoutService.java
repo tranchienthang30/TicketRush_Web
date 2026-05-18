@@ -5,6 +5,8 @@ import com.example.ticket.dto.CheckoutPreviewRequest;
 import com.example.ticket.dto.CheckoutResultResponse;
 import com.example.ticket.dto.CheckoutSummaryResponse;
 import com.example.ticket.dto.CheckoutTicketResponse;
+import com.example.ticket.dto.SeatLockRequest;
+import com.example.ticket.dto.SeatLockResponse;
 import com.example.ticket.exception.ApiException;
 import com.example.ticket.repository.CheckoutQueryRepository;
 import org.slf4j.Logger;
@@ -46,7 +48,7 @@ public class CheckoutService {
             CheckoutQueryRepository checkoutRepository,
             PayOSPaymentService payOSPaymentService,
             PaymentConfirmationEmailService paymentConfirmationEmailService,
-            @Value("${app.booking.lock-minutes:10}") int bookingLockMinutes
+            @Value("${app.booking.lock-minutes:1}") int bookingLockMinutes
     ) {
         this.checkoutRepository = checkoutRepository;
         this.payOSPaymentService = payOSPaymentService;
@@ -55,8 +57,49 @@ public class CheckoutService {
     }
 
     public CheckoutSummaryResponse preview(UUID userId, CheckoutPreviewRequest request) {
-        CheckoutEvaluation evaluation = evaluate(userId, request.eventId(), request.seatIds(), request.voucherCode());
+        CheckoutEvaluation evaluation = evaluate(
+                userId,
+                request.eventId(),
+                request.seatIds(),
+                request.voucherCode(),
+                SeatValidationMode.PREVIEW,
+                false
+        );
         return toSummaryResponse(evaluation);
+    }
+
+    @Transactional
+    public SeatLockResponse lockSeats(UUID userId, SeatLockRequest request) {
+        List<UUID> seatIds = normalizeSeatIds(request.seatIds());
+        OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
+        OffsetDateTime lockExpiresAt = now.plusMinutes(bookingLockMinutes);
+
+        CheckoutQueryRepository.EventCheckoutRow event = checkoutRepository.findPublishedEvent(request.eventId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
+
+        List<CheckoutQueryRepository.SeatCheckoutRow> seats = checkoutRepository.findSeatsByIdsForUpdate(seatIds);
+        validateSeatOwnershipAndAvailability(userId, event.id(), seats, seatIds, now, SeatValidationMode.LOCK);
+        int lockedCount = checkoutRepository.setSeatLocks(userId, event.id(), seatIds, lockExpiresAt);
+        if (lockedCount != seatIds.size()) {
+            throw new ApiException(HttpStatus.CONFLICT, "One or more seats cannot be locked right now");
+        }
+
+        return new SeatLockResponse(event.id(), seatIds, lockExpiresAt);
+    }
+
+    @Transactional
+    public SeatLockResponse releaseSeats(UUID userId, SeatLockRequest request) {
+        List<UUID> seatIds = normalizeSeatIds(request.seatIds());
+        OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
+
+        CheckoutQueryRepository.EventCheckoutRow event = checkoutRepository.findPublishedEvent(request.eventId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
+
+        List<CheckoutQueryRepository.SeatCheckoutRow> seats = checkoutRepository.findSeatsByIdsForUpdate(seatIds);
+        validateSeatOwnershipAndAvailability(userId, event.id(), seats, seatIds, now, SeatValidationMode.RELEASE);
+        checkoutRepository.releaseSeatLocksForUser(userId, event.id(), seatIds);
+
+        return new SeatLockResponse(event.id(), seatIds, null);
     }
 
     @Transactional
@@ -86,25 +129,27 @@ public class CheckoutService {
             return;
         }
 
+        checkoutRepository.markOrderSeatsSold(order.orderId());
         checkoutRepository.issueTicketsForOrder(order.orderId(), now);
         sendOrderSuccessEmail(order.orderId());
     }
 
     @Transactional
     public CheckoutResultResponse confirm(UUID userId, CheckoutConfirmRequest request) {
-        CheckoutEvaluation evaluation = evaluate(userId, request.eventId(), request.seatIds(), request.voucherCode());
+        CheckoutEvaluation evaluation = evaluate(
+                userId,
+                request.eventId(),
+                request.seatIds(),
+                request.voucherCode(),
+                SeatValidationMode.CONFIRM,
+                true
+        );
         OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
         OffsetDateTime expiresAt = now.plusMinutes(bookingLockMinutes);
         UUID orderId = UUID.randomUUID();
         boolean payWithBankQr = PAYMENT_METHOD_BANK_QR.equalsIgnoreCase(request.paymentMethod());
         Long payosOrderCode = payWithBankQr ? payOSPaymentService.generateOrderCode(orderId) : null;
-
-        for (CheckoutQueryRepository.SeatCheckoutRow seat : evaluation.seats()) {
-            int updated = checkoutRepository.markSeatSold(seat.id(), evaluation.event().id());
-            if (updated == 0) {
-                throw new ApiException(HttpStatus.CONFLICT, "Seat " + seat.seatCode() + " is no longer available");
-            }
-        }
+        List<UUID> seatIds = evaluation.seats().stream().map(CheckoutQueryRepository.SeatCheckoutRow::id).toList();
 
         checkoutRepository.insertOrder(
                 orderId,
@@ -150,6 +195,10 @@ public class CheckoutService {
         }
 
         if (payWithBankQr) {
+            int lockedCount = checkoutRepository.setSeatLocks(userId, evaluation.event().id(), seatIds, expiresAt);
+            if (lockedCount != seatIds.size()) {
+                throw new ApiException(HttpStatus.CONFLICT, "One or more seats cannot be locked right now");
+            }
             String checkoutUrl = payOSPaymentService.createCheckoutUrl(
                     orderId,
                     payosOrderCode,
@@ -174,6 +223,7 @@ public class CheckoutService {
             );
         }
 
+        checkoutRepository.markOrderSeatsSold(orderId);
         checkoutRepository.issueTicketsForOrder(orderId, now);
         List<CheckoutTicketResponse> tickets = checkoutRepository.findOrderTickets(orderId).stream()
                 .map(row -> new CheckoutTicketResponse(
@@ -225,30 +275,25 @@ public class CheckoutService {
         return status != null && ("SUCCESS".equalsIgnoreCase(status) || "PAID".equalsIgnoreCase(status));
     }
 
-    private CheckoutEvaluation evaluate(UUID userId, UUID eventId, List<UUID> rawSeatIds, String voucherCode) {
-        if (rawSeatIds == null || rawSeatIds.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "At least one seat is required");
-        }
-
-        Set<UUID> uniqueSeatIds = new LinkedHashSet<>(rawSeatIds);
-        List<UUID> seatIds = new ArrayList<>(uniqueSeatIds);
+    private CheckoutEvaluation evaluate(
+            UUID userId,
+            UUID eventId,
+            List<UUID> rawSeatIds,
+            String voucherCode,
+            SeatValidationMode validationMode,
+            boolean forUpdate
+    ) {
+        List<UUID> seatIds = normalizeSeatIds(rawSeatIds);
+        OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
 
         CheckoutQueryRepository.EventCheckoutRow event = checkoutRepository.findPublishedEvent(eventId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
 
-        List<CheckoutQueryRepository.SeatCheckoutRow> seats = checkoutRepository.findSeatsByIds(seatIds);
-        if (seats.size() != seatIds.size()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Some selected seats do not exist");
-        }
+        List<CheckoutQueryRepository.SeatCheckoutRow> seats = forUpdate
+                ? checkoutRepository.findSeatsByIdsForUpdate(seatIds)
+                : checkoutRepository.findSeatsByIds(seatIds);
 
-        for (CheckoutQueryRepository.SeatCheckoutRow seat : seats) {
-            if (!eventId.equals(seat.eventId())) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Selected seats must belong to the same event");
-            }
-            if (!"AVAILABLE".equalsIgnoreCase(seat.status())) {
-                throw new ApiException(HttpStatus.CONFLICT, "Seat " + seat.seatCode() + " is not available");
-            }
-        }
+        validateSeatOwnershipAndAvailability(userId, event.id(), seats, seatIds, now, validationMode);
 
         BigDecimal ticketSubtotal = seats.stream()
                 .map(CheckoutQueryRepository.SeatCheckoutRow::price)
@@ -306,6 +351,78 @@ public class CheckoutService {
                 totalAmount,
                 membershipApplied
         );
+    }
+
+    private List<UUID> normalizeSeatIds(List<UUID> rawSeatIds) {
+        if (rawSeatIds == null || rawSeatIds.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "At least one seat is required");
+        }
+        Set<UUID> uniqueSeatIds = new LinkedHashSet<>(rawSeatIds);
+        return new ArrayList<>(uniqueSeatIds);
+    }
+
+    private void validateSeatOwnershipAndAvailability(
+            UUID userId,
+            UUID eventId,
+            List<CheckoutQueryRepository.SeatCheckoutRow> seats,
+            List<UUID> requestedSeatIds,
+            OffsetDateTime now,
+            SeatValidationMode mode
+    ) {
+        if (seats.size() != requestedSeatIds.size()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Some selected seats do not exist");
+        }
+
+        for (CheckoutQueryRepository.SeatCheckoutRow seat : seats) {
+            if (!eventId.equals(seat.eventId())) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Selected seats must belong to the same event");
+            }
+
+            boolean lockExpired = isLockExpired(seat.lockExpiresAt(), now);
+            boolean lockedByCurrentUser = userId != null && userId.equals(seat.lockedBy()) && !lockExpired;
+            String status = String.valueOf(seat.status()).toUpperCase(Locale.ROOT);
+
+            if (mode == SeatValidationMode.RELEASE) {
+                if ("SOLD".equals(status)) {
+                    throw new ApiException(HttpStatus.CONFLICT, "Seat " + seat.seatCode() + " is already sold");
+                }
+                if ("LOCKED".equals(status) && !lockedByCurrentUser && !lockExpired) {
+                    throw new ApiException(HttpStatus.CONFLICT, "Seat " + seat.seatCode() + " is locked by another user");
+                }
+                continue;
+            }
+
+            if (mode == SeatValidationMode.LOCK) {
+                if ("SOLD".equals(status)) {
+                    throw new ApiException(HttpStatus.CONFLICT, "Seat " + seat.seatCode() + " is already sold");
+                }
+                if ("LOCKED".equals(status) && !lockedByCurrentUser && !lockExpired) {
+                    throw new ApiException(HttpStatus.CONFLICT, "Seat " + seat.seatCode() + " was just locked by another user");
+                }
+                continue;
+            }
+
+            if (mode == SeatValidationMode.CONFIRM) {
+                if (!"LOCKED".equals(status) || !lockedByCurrentUser) {
+                    throw new ApiException(
+                            HttpStatus.CONFLICT,
+                            "Seat " + seat.seatCode() + " must be locked by your account before checkout"
+                    );
+                }
+                continue;
+            }
+
+            if ("SOLD".equals(status)) {
+                throw new ApiException(HttpStatus.CONFLICT, "Seat " + seat.seatCode() + " is already sold");
+            }
+            if ("LOCKED".equals(status) && !lockedByCurrentUser && !lockExpired) {
+                throw new ApiException(HttpStatus.CONFLICT, "Seat " + seat.seatCode() + " is locked by another user");
+            }
+        }
+    }
+
+    private boolean isLockExpired(OffsetDateTime lockExpiresAt, OffsetDateTime now) {
+        return lockExpiresAt != null && !lockExpiresAt.isAfter(now);
     }
 
     private void validateVoucher(CheckoutQueryRepository.VoucherRow voucher, UUID userId, boolean membershipApplied) {
@@ -394,5 +511,12 @@ public class CheckoutService {
             BigDecimal totalAmount,
             boolean membershipApplied
     ) {
+    }
+
+    private enum SeatValidationMode {
+        PREVIEW,
+        LOCK,
+        RELEASE,
+        CONFIRM
     }
 }

@@ -21,4 +21,12 @@ public class CurrentUserService {
         }
         throw new ApiException(HttpStatus.UNAUTHORIZED, "You need to sign in");
     }
+
+    public UUID resolveOptional() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof JwtPrincipal principal) {
+            return principal.userId();
+        }
+        return null;
+    }
 }

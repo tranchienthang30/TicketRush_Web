@@ -80,6 +80,7 @@ public class PaymentWebhookService {
             throw new ApiException(HttpStatus.CONFLICT, "Order is not in pending state");
         }
 
+        checkoutRepository.markOrderSeatsSold(orderId);
         checkoutRepository.issueTicketsForOrder(orderId, now);
         List<PaymentConfirmationEmailService.TicketQrItem> ticketQrItems = checkoutRepository
                 .findOrderTicketQrDetails(orderId).stream()

@@ -87,7 +87,13 @@ public class EventQueryRepository {
                     e.start_time,
                     e.sale_start_time,
                     e.sale_end_time,
-                    (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'AVAILABLE') AS available_seats,
+                    (SELECT COUNT(*) FROM event_seats
+                        WHERE event_id = e.id
+                        AND (
+                            status = 'AVAILABLE'
+                            OR (status = 'LOCKED' AND lock_expires_at IS NOT NULL AND lock_expires_at <= now())
+                        )
+                    ) AS available_seats,
                     (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'SOLD') AS sold_seats
                 FROM events e
                 LEFT JOIN cinema_halls ch ON ch.id = e.hall_id
@@ -117,7 +123,7 @@ public class EventQueryRepository {
                 this::mapBookingSectionRow);
     }
 
-    public List<BookingSeatRow> findSeatsByEvent(UUID eventId) {
+    public List<BookingSeatRow> findSeatsByEvent(UUID eventId, UUID viewerUserId) {
         String sql = """
                 SELECT
                     id,
@@ -127,19 +133,42 @@ public class EventQueryRepository {
                     seat_number,
                     seat_code,
                     price,
-                    status::text AS status,
+                    CASE
+                        WHEN status = 'LOCKED'
+                            AND lock_expires_at IS NOT NULL
+                            AND lock_expires_at <= now()
+                            THEN 'AVAILABLE'
+                        ELSE status::text
+                    END AS status,
                     COALESCE(seat_type_code, 'STANDARD') AS seat_type_code,
                     layout_x,
                     layout_y,
                     is_hidden,
-                    is_accessible
+                    is_accessible,
+                    lock_expires_at,
+                    CASE
+                        WHEN status = 'LOCKED'
+                            AND lock_expires_at IS NOT NULL
+                            AND lock_expires_at > now()
+                            THEN locked_by
+                        ELSE NULL
+                    END AS lock_owner_user_id,
+                    (
+                        :viewerUserId IS NOT NULL
+                        AND status = 'LOCKED'
+                        AND lock_expires_at IS NOT NULL
+                        AND lock_expires_at > now()
+                        AND locked_by = :viewerUserId
+                    ) AS locked_by_current_user
                 FROM event_seats
                 WHERE event_id = :eventId
                 ORDER BY row_label ASC, seat_number ASC
                 """;
 
         return jdbcTemplate.query(sql,
-                new MapSqlParameterSource("eventId", eventId),
+                new MapSqlParameterSource()
+                        .addValue("eventId", eventId)
+                        .addValue("viewerUserId", viewerUserId),
                 this::mapBookingSeatRow);
     }
 
@@ -159,7 +188,13 @@ public class EventQueryRepository {
                     e.sale_start_time,
                     e.sale_end_time,
                     COALESCE((SELECT MIN(base_price) FROM event_sections WHERE event_id = e.id), 0) AS min_price,
-                    (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'AVAILABLE') AS available_seats,
+                    (SELECT COUNT(*) FROM event_seats
+                        WHERE event_id = e.id
+                        AND (
+                            status = 'AVAILABLE'
+                            OR (status = 'LOCKED' AND lock_expires_at IS NOT NULL AND lock_expires_at <= now())
+                        )
+                    ) AS available_seats,
                     (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'SOLD') AS sold_seats
                 FROM events e
                     LEFT JOIN categories c ON c.id = e.category_id
@@ -274,7 +309,10 @@ public class EventQueryRepository {
                 rs.getObject("layout_x", Integer.class),
                 rs.getObject("layout_y", Integer.class),
                 rs.getBoolean("is_hidden"),
-                rs.getBoolean("is_accessible")
+                rs.getBoolean("is_accessible"),
+                rs.getObject("lock_expires_at", OffsetDateTime.class),
+                rs.getObject("lock_owner_user_id", UUID.class),
+                rs.getBoolean("locked_by_current_user")
         );
     }
 
@@ -337,7 +375,10 @@ public class EventQueryRepository {
             Integer layoutX,
             Integer layoutY,
             boolean hidden,
-            boolean accessible
+            boolean accessible,
+            OffsetDateTime lockExpiresAt,
+            UUID lockOwnerUserId,
+            boolean lockedByCurrentUser
     ) {
     }
 }

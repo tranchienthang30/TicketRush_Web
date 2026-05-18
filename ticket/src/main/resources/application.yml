@@ -69,7 +69,7 @@ app:
 
   mail:
     from: ${MAIL_FROM:no-reply@ticketrush.local}
-  
+
   admin:
     email: ${ADMIN_EMAIL:}
 
@@ -82,7 +82,9 @@ app:
     min-score: ${RECAPTCHA_MIN_SCORE:0.5}
 
   booking:
-    lock-minutes: 10
+    lock-minutes: 1
+    expire-interval-ms: 15000
+    expire-initial-delay-ms: 15000
 
   payos:
     client-id: ${PAYOS_CLIENT_ID:}

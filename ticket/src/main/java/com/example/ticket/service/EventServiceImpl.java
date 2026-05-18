@@ -210,12 +210,12 @@ public class EventServiceImpl implements EventService {
 
     @Override
     @Transactional(readOnly = true)
-    public BookingEventResponse getBookingEvent(UUID eventId) {
+    public BookingEventResponse getBookingEvent(UUID eventId, UUID viewerUserId) {
         EventQueryRepository.BookingEventRow event = eventQueryRepository.findPublishedEventForBooking(eventId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
 
         List<EventQueryRepository.BookingSectionRow> sections = eventQueryRepository.findSectionsByEvent(eventId);
-        Map<UUID, List<BookingSeatResponse>> seatsBySection = eventQueryRepository.findSeatsByEvent(eventId).stream()
+        Map<UUID, List<BookingSeatResponse>> seatsBySection = eventQueryRepository.findSeatsByEvent(eventId, viewerUserId).stream()
                 .collect(Collectors.groupingBy(
                         EventQueryRepository.BookingSeatRow::sectionId,
                         Collectors.mapping(row -> new BookingSeatResponse(
@@ -230,7 +230,10 @@ public class EventServiceImpl implements EventService {
                                 row.layoutX(),
                                 row.layoutY(),
                                 row.hidden(),
-                                row.accessible()
+                                row.accessible(),
+                                row.lockExpiresAt(),
+                                row.lockOwnerUserId(),
+                                row.lockedByCurrentUser()
                         ), Collectors.toList())
                 ));
 

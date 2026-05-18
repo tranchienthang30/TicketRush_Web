@@ -24,5 +24,5 @@ public interface EventService {
 
     EventPageResponse searchEvents(Long categoryId, String query, String city, int page, int size);
 
-    BookingEventResponse getBookingEvent(UUID eventId);
+    BookingEventResponse getBookingEvent(UUID eventId, UUID viewerUserId);
 }
