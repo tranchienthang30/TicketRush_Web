@@ -14,5 +14,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByEmailIgnoreCase(String email);
 
+    List<User> findAllByOrderByCreatedAtDesc();
+
     List<User> findByProviderRequestStatusOrderByProviderRequestedAtAsc(String providerRequestStatus);
 }

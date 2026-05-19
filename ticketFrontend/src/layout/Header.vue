@@ -52,7 +52,6 @@ const visibleNavItems = computed(() => {
       { name: "User", path: "/admin/users" },
       { name: "System", path: "/admin/system" },
       { name: "Provider Requests", path: "/admin/provider-requests" },
-      { name: "Help Center", path: "/help" },
     ];
   }
 

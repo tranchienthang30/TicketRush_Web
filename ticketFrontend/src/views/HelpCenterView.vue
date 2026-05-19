@@ -1,7 +1,10 @@
 <script setup>
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
+import { useAuthStore } from "@/stores/authStore";
 
-const helpCategories = ref([
+const authStore = useAuthStore();
+
+const customerHelpCategories = [
   {
     id: "events",
     title: "Events & Tickets",
@@ -59,10 +62,91 @@ const helpCategories = ref([
       },
     ],
   },
-]);
+];
 
-const expandedCategory = ref("events");
+const providerHelpCategories = [
+  {
+    id: "event-setup",
+    title: "Create Events",
+    icon: "01",
+    articles: [
+      {
+        id: "pr1",
+        title: "How do I create a provider event?",
+        content:
+          '<p class="mb-4">Open <strong>Create Event</strong>, complete event information, configure seats, then add payout details before publishing.</p><ul class="list-disc pl-6 space-y-2"><li>Step 1: Event image, title, venue, date, sale window, and public content.</li><li>Step 2: Seat setup using Simple or Advanced mode.</li><li>Step 3: Bank account and platform fee confirmation.</li></ul>',
+      },
+      {
+        id: "pr2",
+        title: "When can I edit an event?",
+        content:
+          "<p class=\"mb-4\">You can edit an event before the sale window starts. Once ticket sales have started, TicketRush blocks editing and shows <strong>Can't edit while starting sell</strong> to protect customer booking data.</p><p>Review sale start and sale end times carefully before publishing.</p>",
+      },
+    ],
+  },
+  {
+    id: "seat-setup",
+    title: "Seat Setup",
+    icon: "02",
+    articles: [
+      {
+        id: "pr3",
+        title: "Simple vs Advanced seat setup",
+        content:
+          '<p class="mb-4"><strong>Simple</strong> uses TicketRush internal seat rows. Configure row labels, seat count, ranges, ticket type names, colors, prices, and initially booked seats.</p><p><strong>Advanced</strong> uses seats.io. Create or link a workspace, chart, and seats.io event, then map chart categories to TicketRush prices.</p>',
+      },
+      {
+        id: "pr4",
+        title: "How do custom seat types and colors work?",
+        content:
+          '<p class="mb-4">In Simple mode, each range can have a custom display type such as Early Bird, Premium, Sponsor, or Student. The selected color appears in the customer seat map legend and on available seat cells.</p><p>The technical behavior still uses Standard, VIP, Couple, Sweetbox, or Accessible so booking rules remain stable.</p>',
+      },
+    ],
+  },
+  {
+    id: "booking-revenue",
+    title: "Booking & Revenue",
+    icon: "03",
+    articles: [
+      {
+        id: "pr5",
+        title: "Where do I see sold tickets and revenue?",
+        content:
+          '<p class="mb-4">Open <strong>Manage Events</strong> and click <strong>Booking</strong> on an event. The summary shows booked tickets, gross revenue, TicketRush platform fee, and provider revenue.</p><p>TicketRush calculates the platform fee as <strong>5%</strong> of sold ticket revenue.</p>',
+      },
+      {
+        id: "pr6",
+        title: "How does payout information work?",
+        content:
+          '<p class="mb-4">Payout bank information is collected during event creation so the platform can show fee terms and keep provider settlement data with the event.</p><p>Use accurate bank name, account holder, and account number before publishing.</p>',
+      },
+    ],
+  },
+];
+
+const isProvider = computed(() => authStore.user?.role === "PROVIDER");
+const helpCategories = computed(() => (isProvider.value ? providerHelpCategories : customerHelpCategories));
+const searchPlaceholder = computed(() =>
+  isProvider.value ? "Search provider operations help..." : "Search event booking help...",
+);
+const pageTitle = computed(() => (isProvider.value ? "Provider Help Center" : "How can we help you?"));
+
+const expandedCategory = ref(helpCategories.value[0].id);
 const activeArticle = ref(helpCategories.value[0].articles[0]);
+
+watch(
+  helpCategories,
+  (categories) => {
+    const activeStillExists = categories.some((category) =>
+      category.articles.some((article) => article.id === activeArticle.value?.id),
+    );
+    if (!activeStillExists) {
+      expandedCategory.value = categories[0].id;
+      activeArticle.value = categories[0].articles[0];
+    }
+  },
+  { immediate: true },
+);
 
 const toggleCategory = (categoryId) => {
   expandedCategory.value = expandedCategory.value === categoryId ? null : categoryId;
@@ -77,11 +161,11 @@ const selectArticle = (article) => {
 <template>
   <div class="bg-slate-50 dark:bg-slate-900 min-h-screen pb-20">
     <div class="bg-brand-navy py-16 px-4 text-center">
-      <h1 class="text-3xl md:text-5xl font-black text-white mb-4 tracking-tight">How can we help you?</h1>
+      <h1 class="text-3xl md:text-5xl font-black text-white mb-4 tracking-tight">{{ pageTitle }}</h1>
       <div class="max-w-2xl mx-auto relative">
         <input
           type="text"
-          placeholder="Search event booking help..."
+          :placeholder="searchPlaceholder"
           class="w-full px-6 py-4 rounded-full text-lg shadow-lg focus:outline-none focus:ring-4 focus:ring-brand-orange/50"
         />
         <button class="absolute right-3 top-2.5 bg-brand-orange text-white p-2.5 rounded-full hover:bg-orange-500 transition">

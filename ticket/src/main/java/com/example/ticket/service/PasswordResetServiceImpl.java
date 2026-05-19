@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Locale;
@@ -62,12 +63,17 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     @Transactional
     public void resetPassword(String token, String password) {
         String key = resetTokenKey(token);
-        String userId = redisTemplate.opsForValue().get(key);
-        if (userId == null) {
+        String tokenValue = redisTemplate.opsForValue().get(key);
+        if (tokenValue == null) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Reset token is invalid or expired");
+        }
+        ResetTokenPayload payload = parseTokenPayload(tokenValue);
+        if (payload.expiresAt().isBefore(Instant.now())) {
+            redisTemplate.delete(key);
             throw new AppException(HttpStatus.BAD_REQUEST, "Reset token is invalid or expired");
         }
 
-        User user = userRepository.findById(UUID.fromString(userId))
+        User user = userRepository.findById(payload.userId())
                 .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Reset token is invalid or expired"));
 
         user.setPasswordHash(passwordEncoder.encode(password));
@@ -77,7 +83,8 @@ public class PasswordResetServiceImpl implements PasswordResetService {
 
     private void createTokenAndSendEmail(User user) {
         String token = generateToken();
-        redisTemplate.opsForValue().set(resetTokenKey(token), user.getId().toString(), TOKEN_TTL);
+        Instant expiresAt = Instant.now().plus(TOKEN_TTL);
+        redisTemplate.opsForValue().set(resetTokenKey(token), user.getId() + ":" + expiresAt.toEpochMilli(), TOKEN_TTL);
         String resetLink = frontendUrl + "/reset-password?token=" + token;
         emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), resetLink);
     }
@@ -102,6 +109,21 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         return "auth:password-reset:token:" + sha256(token);
     }
 
+    private ResetTokenPayload parseTokenPayload(String value) {
+        String[] parts = value.split(":", 2);
+        if (parts.length != 2) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Reset token is invalid or expired");
+        }
+        try {
+            return new ResetTokenPayload(
+                    UUID.fromString(parts[0]),
+                    Instant.ofEpochMilli(Long.parseLong(parts[1]))
+            );
+        } catch (RuntimeException ex) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Reset token is invalid or expired");
+        }
+    }
+
     private String sha256(String value) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
@@ -113,5 +135,8 @@ public class PasswordResetServiceImpl implements PasswordResetService {
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private record ResetTokenPayload(UUID userId, Instant expiresAt) {
     }
 }

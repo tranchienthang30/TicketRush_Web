@@ -23,7 +23,9 @@ public record UserResponse(
         Instant providerRequestedAt,
         Instant providerReviewedAt,
         UUID providerReviewedBy,
-        String providerRejectionReason
+        String providerRejectionReason,
+        Instant createdAt,
+        Instant updatedAt
 ) {
     public static UserResponse from(User user) {
         return from(user, null);
@@ -46,7 +48,9 @@ public record UserResponse(
                 user.getProviderRequestedAt(),
                 user.getProviderReviewedAt(),
                 user.getProviderReviewedBy(),
-                user.getProviderRejectionReason()
+                user.getProviderRejectionReason(),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
         );
     }
 }

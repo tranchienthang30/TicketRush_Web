@@ -253,7 +253,7 @@ function formatMoney(value) {
 
 function formatDateTime(value) {
   if (!value) return ''
-  return new Intl.DateTimeFormat('vi-VN', {
+  return new Intl.DateTimeFormat('en-US', {
     dateStyle: 'full',
     timeStyle: 'short',
   }).format(new Date(value))
