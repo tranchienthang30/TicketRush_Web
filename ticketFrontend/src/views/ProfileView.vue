@@ -126,7 +126,7 @@ onMounted(loadDashboard);
               Profile
             </p>
             <h1 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">
-              Your TicketRush home base.
+              Your Starlight home base.
             </h1>
             <p class="mt-5 max-w-2xl text-base md:text-lg text-blue-100 leading-relaxed">
               Keep account details, membership perks, and upcoming plans in one

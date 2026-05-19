@@ -10,6 +10,10 @@ const error = ref("");
 const seatsioWorkspace = ref(null);
 const seatsioError = ref("");
 const selectedSeatsioEvent = ref(null);
+const selectedBookingEvent = ref(null);
+const bookingSummary = ref(null);
+const bookingSummaryLoading = ref(false);
+const bookingSummaryError = ref("");
 let seatsioScriptPromise = null;
 let seatsioManager = null;
 
@@ -50,6 +54,17 @@ function formatDuration(minutes) {
   return `${remainingMinutes}m`;
 }
 
+function formatMoney(value) {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(Number(value || 0));
+}
+
+function formatPercent(value) {
+  return `${Math.round(Number(value || 0) * 100)}%`;
+}
+
 function formatListingType(type) {
   return String(type || "NOW_SHOWING").replaceAll("_", " ");
 }
@@ -70,11 +85,36 @@ function isPastEvent(event) {
 }
 
 function canOpenBooking(event) {
-  const listingType = String(event.listingType || "").toUpperCase();
   const now = Date.now();
   const saleStart = event.saleStartTime ? new Date(event.saleStartTime).getTime() : null;
   const saleEnd = event.saleEndTime ? new Date(event.saleEndTime).getTime() : null;
-  return listingType !== "UPCOMING" && (!saleStart || saleStart <= now) && (!saleEnd || saleEnd >= now);
+  return (!saleStart || saleStart <= now) && (!saleEnd || saleEnd >= now);
+}
+
+function canEditEvent(event) {
+  const saleStart = event.saleStartTime ? new Date(event.saleStartTime).getTime() : null;
+  return !saleStart || saleStart > Date.now();
+}
+
+async function openBookingSummary(event) {
+  selectedBookingEvent.value = event;
+  bookingSummary.value = null;
+  bookingSummaryError.value = "";
+  bookingSummaryLoading.value = true;
+  try {
+    const response = await eventApi.getMyEventBookingSummary(event.id);
+    bookingSummary.value = response.data;
+  } catch (err) {
+    bookingSummaryError.value = err.response?.data?.message || "Unable to load booking summary.";
+  } finally {
+    bookingSummaryLoading.value = false;
+  }
+}
+
+function closeBookingSummary() {
+  selectedBookingEvent.value = null;
+  bookingSummary.value = null;
+  bookingSummaryError.value = "";
 }
 
 async function openSeatsioManager(event) {
@@ -173,17 +213,17 @@ function loadSeatsioScript(cdnUrl) {
               </div>
               <div class="flex flex-wrap gap-2">
                 <RouterLink :to="event.slug ? `/events/${event.slug}` : '/events'" class="bg-brand-navy text-white px-4 py-2 rounded-lg font-bold">View</RouterLink>
-                <RouterLink
-                  v-if="canOpenBooking(event)"
-                  :to="`/booking?eventId=${event.id}`"
+                <button
+                  type="button"
                   class="bg-brand-orange text-white px-4 py-2 rounded-lg font-bold"
+                  @click="openBookingSummary(event)"
                 >
                   Booking
-                </RouterLink>
-                <button v-else class="bg-slate-100 text-slate-400 px-4 py-2 rounded-lg font-bold cursor-not-allowed" disabled>
-                  Booking closed
                 </button>
-                <RouterLink :to="`/events/${event.id}/edit`" class="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold">Edit</RouterLink>
+                <RouterLink v-if="canEditEvent(event)" :to="`/events/${event.id}/edit`" class="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold">Edit</RouterLink>
+                <button v-else class="bg-slate-100 text-slate-400 px-4 py-2 rounded-lg font-bold cursor-not-allowed" disabled>
+                  Can't edit while starting sell
+                </button>
                 <button
                   v-if="event.seatProvider === 'SEATS_IO'"
                   class="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-bold"
@@ -196,6 +236,63 @@ function loadSeatsioScript(cdnUrl) {
             </div>
           </div>
         </section>
+      </div>
+    </div>
+
+    <div v-if="selectedBookingEvent" class="fixed inset-0 z-50 bg-slate-950/70 p-4">
+      <div class="mx-auto max-w-3xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+        <div class="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <p class="text-sm font-black uppercase tracking-[0.18em] text-brand-orange">Booking summary</p>
+            <h2 class="text-2xl font-black text-slate-900 dark:text-white">{{ selectedBookingEvent.title }}</h2>
+          </div>
+          <button class="rounded-xl bg-slate-100 px-4 py-2 font-black text-slate-700 dark:bg-slate-800 dark:text-slate-100" @click="closeBookingSummary">
+            Close
+          </button>
+        </div>
+
+        <p v-if="bookingSummaryLoading" class="rounded-xl bg-slate-50 px-4 py-3 text-sm font-bold text-slate-500 dark:bg-slate-800">
+          Loading booking summary...
+        </p>
+        <p v-else-if="bookingSummaryError" class="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+          {{ bookingSummaryError }}
+        </p>
+        <div v-else-if="bookingSummary" class="space-y-5">
+          <div class="grid gap-4 md:grid-cols-2">
+            <div class="rounded-xl border border-slate-200 p-5 dark:border-slate-700">
+              <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Booked tickets</p>
+              <p class="mt-2 text-3xl font-black text-brand-navy dark:text-white">{{ bookingSummary.bookedTickets }}</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 p-5 dark:border-slate-700">
+              <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Gross revenue</p>
+              <p class="mt-2 text-3xl font-black text-brand-orange">{{ formatMoney(bookingSummary.grossRevenue) }}</p>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-slate-200 p-5 dark:border-slate-700">
+            <div class="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 text-sm font-bold dark:border-slate-800">
+              <span class="text-slate-500">Platform fee ({{ formatPercent(bookingSummary.platformFeeRate) }})</span>
+              <span class="text-slate-900 dark:text-white">{{ formatMoney(bookingSummary.platformFeeAmount) }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-4 pt-3 text-sm font-black">
+              <span class="text-slate-700 dark:text-slate-200">Provider revenue</span>
+              <span class="text-emerald-600">{{ formatMoney(bookingSummary.providerRevenue) }}</span>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap justify-end gap-2">
+            <RouterLink
+              v-if="canOpenBooking(selectedBookingEvent)"
+              :to="`/booking?eventId=${selectedBookingEvent.id}`"
+              class="rounded-lg bg-brand-navy px-4 py-2 font-bold text-white"
+            >
+              Open booking page
+            </RouterLink>
+            <button v-else class="rounded-lg bg-slate-100 px-4 py-2 font-bold text-slate-400" disabled>
+              Booking page closed
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

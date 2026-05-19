@@ -48,12 +48,24 @@ const canBook = computed(() => {
   const event = eventDetail.value;
   if (!event) return false;
 
-  const listingType = String(event.listingType || "").toUpperCase();
   const now = Date.now();
   const saleStart = event.saleStartTime ? new Date(event.saleStartTime).getTime() : null;
   const saleEnd = event.saleEndTime ? new Date(event.saleEndTime).getTime() : null;
 
-  return listingType !== "UPCOMING" && (!saleStart || saleStart <= now) && (!saleEnd || saleEnd >= now);
+  return (!saleStart || saleStart <= now) && (!saleEnd || saleEnd >= now);
+});
+
+const bookingUnavailableLabel = computed(() => {
+  const event = eventDetail.value;
+  if (!event) return "Coming soon";
+
+  const now = Date.now();
+  const saleStart = event.saleStartTime ? new Date(event.saleStartTime).getTime() : null;
+  const saleEnd = event.saleEndTime ? new Date(event.saleEndTime).getTime() : null;
+
+  if (saleStart && saleStart > now) return "Coming soon";
+  if (saleEnd && saleEnd < now) return "Booking closed";
+  return "Booking unavailable";
 });
 
 const bookingRoute = computed(() => ({
@@ -194,7 +206,7 @@ function formatDuration(value) {
                 v-else
                 class="rounded-2xl bg-white/15 px-8 py-4 text-sm font-black uppercase tracking-[0.16em] text-white ring-1 ring-white/20"
               >
-                Coming soon
+                {{ bookingUnavailableLabel }}
               </span>
               <RouterLink to="/events" class="font-black text-white/80 hover:text-white">
                 Back to events

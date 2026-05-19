@@ -50,6 +50,8 @@ public record CreateEventRequest(
 
         String seatProvider,
         String externalSeatChartKey,
+        String externalSeatWorkspaceKey,
+        String externalSeatEventKey,
 
         String payoutBankName,
         String payoutAccountName,
@@ -59,7 +61,11 @@ public record CreateEventRequest(
 
         @Valid
         @Size(max = 30, message = "Too many sections")
-        List<EventSectionRequest> sections
+        List<EventSectionRequest> sections,
+
+        @Valid
+        @Size(max = 60, message = "Too many seat rows")
+        List<InternalSeatRowRequest> internalSeatRows
 ) {
     @AssertTrue(message = "End time must be after start time")
     public boolean isEventTimeValid() {

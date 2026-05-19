@@ -56,8 +56,7 @@ const canBook = computed(() => {
     return props.event.bookable;
   }
 
-  const listingType = String(props.event.listingType || "").toUpperCase();
-  return listingType !== "UPCOMING" && props.event.tag !== "Coming Soon" && props.event.tag !== "Sold Out";
+  return props.event.tag !== "Coming Soon" && props.event.tag !== "Sold Out";
 });
 
 const detailPath = computed(() => (props.event.slug ? `/events/${props.event.slug}` : "/events"));

@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface EventSectionRepository extends JpaRepository<EventSection, UUID> {
     List<EventSection> findByEvent_IdOrderByDisplayOrderAsc(UUID eventId);
+
+    void deleteByEvent_Id(UUID eventId);
 }

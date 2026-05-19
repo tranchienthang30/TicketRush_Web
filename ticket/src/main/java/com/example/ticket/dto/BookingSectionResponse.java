@@ -11,6 +11,8 @@ public record BookingSectionResponse(
         int rowCount,
         int seatsPerRow,
         int displayOrder,
+        String seatTypeCode,
+        String visualColorHex,
         List<BookingSeatResponse> seats
 ) {
 }

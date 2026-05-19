@@ -44,6 +44,15 @@ public class EventSection {
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder;
 
+    @Column(name = "seat_type_code")
+    private String seatTypeCode;
+
+    @Column(name = "visual_color_hex")
+    private String visualColorHex;
+
+    @Column
+    private String note;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

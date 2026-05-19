@@ -12,6 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -114,6 +115,12 @@ public class Event {
     @Column(name = "external_seat_chart_key")
     private String externalSeatChartKey;
 
+    @Column(name = "external_seat_workspace_key")
+    private String externalSeatWorkspaceKey;
+
+    @Column(name = "external_seat_event_key")
+    private String externalSeatEventKey;
+
     @Column(name = "payout_bank_name")
     private String payoutBankName;
 
@@ -141,5 +148,10 @@ public class Event {
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        updatedAt = Instant.now();
     }
 }

@@ -5,9 +5,12 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.*;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.nio.file.Path;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
@@ -15,6 +18,11 @@ public class CorsConfig implements WebMvcConfigurer {
             "http://localhost:5173",
             "http://127.0.0.1:5173"
     );
+    private final String uploadDir;
+
+    public CorsConfig(@Value("${app.upload.dir:uploads}") String uploadDir) {
+        this.uploadDir = uploadDir;
+    }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -38,5 +46,12 @@ public class CorsConfig implements WebMvcConfigurer {
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
+    }
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        String uploadLocation = Path.of(uploadDir).toAbsolutePath().normalize().toUri().toString();
+        registry.addResourceHandler("/uploads/**")
+                .addResourceLocations(uploadLocation);
     }
 }

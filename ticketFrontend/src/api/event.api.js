@@ -24,6 +24,10 @@ export function getMyEvent(eventId) {
   return apiClient.get(`/api/events/my-events/${eventId}`);
 }
 
+export function getMyEventBookingSummary(eventId) {
+  return apiClient.get(`/api/events/my-events/${eventId}/booking-summary`);
+}
+
 export async function uploadEventBanner(file) {
   const formData = new FormData();
   formData.append("file", file);

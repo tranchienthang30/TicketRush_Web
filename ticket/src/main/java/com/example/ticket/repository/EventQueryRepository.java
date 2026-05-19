@@ -38,6 +38,36 @@ public class EventQueryRepository {
         ));
     }
 
+    public ProviderBookingSummaryRow findProviderBookingSummary(UUID eventId) {
+        String sql = """
+                SELECT
+                    e.id AS event_id,
+                    e.title,
+                    COUNT(oi.id) FILTER (
+                        WHERE o.status IN ('PAID', 'SUCCESS')
+                        AND oi.ticket_status IN ('VALID', 'USED')
+                    ) AS booked_tickets,
+                    COALESCE(SUM(oi.price_snapshot) FILTER (
+                        WHERE o.status IN ('PAID', 'SUCCESS')
+                        AND oi.ticket_status IN ('VALID', 'USED')
+                    ), 0) AS gross_revenue
+                FROM events e
+                LEFT JOIN orders o ON o.event_id = e.id
+                LEFT JOIN order_items oi ON oi.order_id = o.id
+                WHERE e.id = :eventId
+                GROUP BY e.id, e.title
+                """;
+
+        return jdbcTemplate.queryForObject(sql,
+                new MapSqlParameterSource("eventId", eventId),
+                (rs, rowNum) -> new ProviderBookingSummaryRow(
+                        rs.getObject("event_id", UUID.class),
+                        rs.getString("title"),
+                        rs.getLong("booked_tickets"),
+                        rs.getBigDecimal("gross_revenue")
+                ));
+    }
+
     public List<EventRow> findPublishedEventsByCategory(long categoryId, int limit) {
         String sql = baseEventSql("""
                 e.category_id = :categoryId
@@ -87,19 +117,29 @@ public class EventQueryRepository {
                     e.start_time,
                     e.sale_start_time,
                     e.sale_end_time,
-                    (SELECT COUNT(*) FROM event_seats
-                        WHERE event_id = e.id
-                        AND (
-                            status = 'AVAILABLE'
-                            OR (status = 'LOCKED' AND lock_expires_at IS NOT NULL AND lock_expires_at <= now())
+                    e.seat_provider,
+                    e.external_seat_workspace_key,
+                    e.external_seat_chart_key,
+                    e.external_seat_event_key,
+                    CASE
+                        WHEN e.seat_provider = 'SEATS_IO'
+                            THEN COALESCE((SELECT SUM(row_count * seats_per_row) FROM event_sections WHERE event_id = e.id), 0)
+                        ELSE (SELECT COUNT(*) FROM event_seats
+                            WHERE event_id = e.id
+                            AND (
+                                status = 'AVAILABLE'
+                                OR (status = 'LOCKED' AND lock_expires_at IS NOT NULL AND lock_expires_at <= now())
+                            )
                         )
-                    ) AS available_seats,
-                    (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'SOLD') AS sold_seats
+                    END AS available_seats,
+                    CASE
+                        WHEN e.seat_provider = 'SEATS_IO' THEN 0
+                        ELSE (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'SOLD')
+                    END AS sold_seats
                 FROM events e
                 LEFT JOIN cinema_halls ch ON ch.id = e.hall_id
                 WHERE e.id = :eventId
                 AND e.status = 'PUBLISHED'
-                AND COALESCE(e.listing_type, 'NOW_SHOWING') <> 'UPCOMING'
                 AND (e.sale_start_time IS NULL OR e.sale_start_time <= now())
                 AND (e.sale_end_time IS NULL OR e.sale_end_time >= now())
                 """;
@@ -112,7 +152,9 @@ public class EventQueryRepository {
 
     public List<BookingSectionRow> findSectionsByEvent(UUID eventId) {
         String sql = """
-                SELECT id, event_id, name, base_price, row_count, seats_per_row, display_order
+                SELECT id, event_id, name, base_price, row_count, seats_per_row, display_order,
+                       COALESCE(seat_type_code, 'STANDARD') AS seat_type_code,
+                       visual_color_hex
                 FROM event_sections
                 WHERE event_id = :eventId
                 ORDER BY display_order ASC, name ASC
@@ -126,43 +168,46 @@ public class EventQueryRepository {
     public List<BookingSeatRow> findSeatsByEvent(UUID eventId, UUID viewerUserId) {
         String sql = """
                 SELECT
-                    id,
-                    event_id,
-                    section_id,
-                    row_label,
-                    seat_number,
-                    seat_code,
-                    price,
+                    es.id,
+                    es.event_id,
+                    es.section_id,
+                    es.row_label,
+                    es.seat_number,
+                    es.seat_code,
+                    es.price,
                     CASE
-                        WHEN status = 'LOCKED'
-                            AND lock_expires_at IS NOT NULL
-                            AND lock_expires_at <= now()
+                        WHEN es.status = 'LOCKED'
+                            AND es.lock_expires_at IS NOT NULL
+                            AND es.lock_expires_at <= now()
                             THEN 'AVAILABLE'
-                        ELSE status::text
+                        ELSE es.status::text
                     END AS status,
-                    COALESCE(seat_type_code, 'STANDARD') AS seat_type_code,
-                    layout_x,
-                    layout_y,
-                    is_hidden,
-                    is_accessible,
-                    lock_expires_at,
+                    COALESCE(es.seat_type_code, sec.seat_type_code, 'STANDARD') AS seat_type_code,
+                    sec.name AS seat_type_name,
+                    sec.visual_color_hex,
+                    es.layout_x,
+                    es.layout_y,
+                    es.is_hidden,
+                    es.is_accessible,
+                    es.lock_expires_at,
                     CASE
-                        WHEN status = 'LOCKED'
-                            AND lock_expires_at IS NOT NULL
-                            AND lock_expires_at > now()
-                            THEN locked_by
+                        WHEN es.status = 'LOCKED'
+                            AND es.lock_expires_at IS NOT NULL
+                            AND es.lock_expires_at > now()
+                            THEN es.locked_by
                         ELSE NULL
                     END AS lock_owner_user_id,
                     (
                         :viewerUserId IS NOT NULL
-                        AND status = 'LOCKED'
-                        AND lock_expires_at IS NOT NULL
-                        AND lock_expires_at > now()
-                        AND locked_by = :viewerUserId
+                        AND es.status = 'LOCKED'
+                        AND es.lock_expires_at IS NOT NULL
+                        AND es.lock_expires_at > now()
+                        AND es.locked_by = :viewerUserId
                     ) AS locked_by_current_user
-                FROM event_seats
-                WHERE event_id = :eventId
-                ORDER BY row_label ASC, seat_number ASC
+                FROM event_seats es
+                JOIN event_sections sec ON sec.id = es.section_id
+                WHERE es.event_id = :eventId
+                ORDER BY es.row_label ASC, es.seat_number ASC
                 """;
 
         return jdbcTemplate.query(sql,
@@ -278,6 +323,10 @@ public class EventQueryRepository {
                 rs.getObject("start_time", OffsetDateTime.class),
                 rs.getObject("sale_start_time", OffsetDateTime.class),
                 rs.getObject("sale_end_time", OffsetDateTime.class),
+                rs.getString("seat_provider"),
+                rs.getString("external_seat_workspace_key"),
+                rs.getString("external_seat_chart_key"),
+                rs.getString("external_seat_event_key"),
                 rs.getLong("available_seats"),
                 rs.getLong("sold_seats")
         );
@@ -291,7 +340,9 @@ public class EventQueryRepository {
                 rs.getBigDecimal("base_price"),
                 rs.getInt("row_count"),
                 rs.getInt("seats_per_row"),
-                rs.getInt("display_order")
+                rs.getInt("display_order"),
+                rs.getString("seat_type_code"),
+                rs.getString("visual_color_hex")
         );
     }
 
@@ -306,6 +357,8 @@ public class EventQueryRepository {
                 rs.getBigDecimal("price"),
                 rs.getString("status"),
                 rs.getString("seat_type_code"),
+                rs.getString("seat_type_name"),
+                rs.getString("visual_color_hex"),
                 rs.getObject("layout_x", Integer.class),
                 rs.getObject("layout_y", Integer.class),
                 rs.getBoolean("is_hidden"),
@@ -346,6 +399,10 @@ public class EventQueryRepository {
             OffsetDateTime startTime,
             OffsetDateTime saleStartTime,
             OffsetDateTime saleEndTime,
+            String seatProvider,
+            String externalSeatWorkspaceKey,
+            String externalSeatChartKey,
+            String externalSeatEventKey,
             long availableSeats,
             long soldSeats
     ) {
@@ -358,7 +415,9 @@ public class EventQueryRepository {
             BigDecimal basePrice,
             int rowCount,
             int seatsPerRow,
-            int displayOrder
+            int displayOrder,
+            String seatTypeCode,
+            String visualColorHex
     ) {
     }
 
@@ -372,6 +431,8 @@ public class EventQueryRepository {
             BigDecimal price,
             String status,
             String seatTypeCode,
+            String seatTypeName,
+            String visualColorHex,
             Integer layoutX,
             Integer layoutY,
             boolean hidden,
@@ -379,6 +440,14 @@ public class EventQueryRepository {
             OffsetDateTime lockExpiresAt,
             UUID lockOwnerUserId,
             boolean lockedByCurrentUser
+    ) {
+    }
+
+    public record ProviderBookingSummaryRow(
+            UUID eventId,
+            String title,
+            long bookedTickets,
+            BigDecimal grossRevenue
     ) {
     }
 }

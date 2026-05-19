@@ -13,6 +13,8 @@ public record BookingSeatResponse(
         BigDecimal price,
         String status,
         String seatTypeCode,
+        String seatTypeName,
+        String visualColorHex,
         Integer layoutX,
         Integer layoutY,
         boolean hidden,

@@ -25,7 +25,10 @@
               Payment and payout information must belong to the approved provider account.
             </li>
             <li class="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
-              TicketRush can later add admin review before publishing public events.
+              Starlight can later add admin review before publishing public events.
+            </li>
+            <li class="rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-900">
+              Starlight will charge a 5% platform fee for every ticket sold.
             </li>
           </ul>
         </div>

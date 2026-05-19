@@ -6,6 +6,7 @@ import com.example.ticket.dto.CategoryResponse;
 import com.example.ticket.dto.EventPageResponse;
 import com.example.ticket.dto.request.CreateEventRequest;
 import com.example.ticket.dto.response.EventResponse;
+import com.example.ticket.dto.response.ProviderBookingSummaryResponse;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,6 +16,12 @@ public interface EventService {
     List<EventResponse> publicEvents();
 
     List<EventResponse> myEvents();
+
+    EventResponse myEvent(UUID eventId);
+
+    EventResponse updateEvent(UUID eventId, CreateEventRequest request);
+
+    ProviderBookingSummaryResponse providerBookingSummary(UUID eventId);
 
     EventResponse eventBySlug(String slug);
 

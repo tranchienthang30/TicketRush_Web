@@ -6,6 +6,7 @@ import com.example.ticket.dto.EventPageResponse;
 import com.example.ticket.dto.request.CreateEventRequest;
 import com.example.ticket.service.CurrentUserService;
 import com.example.ticket.dto.response.EventResponse;
+import com.example.ticket.dto.response.ProviderBookingSummaryResponse;
 import com.example.ticket.service.EventService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -77,9 +79,24 @@ public class EventController {
         return eventService.myEvents();
     }
 
+    @GetMapping("/events/my-events/{eventId}")
+    EventResponse myEvent(@PathVariable UUID eventId) {
+        return eventService.myEvent(eventId);
+    }
+
+    @GetMapping("/events/my-events/{eventId}/booking-summary")
+    ProviderBookingSummaryResponse myEventBookingSummary(@PathVariable UUID eventId) {
+        return eventService.providerBookingSummary(eventId);
+    }
+
     @PostMapping("/events")
     ResponseEntity<EventResponse> create(@Valid @RequestBody CreateEventRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(eventService.createEvent(request));
+    }
+
+    @PutMapping("/events/{eventId}")
+    EventResponse update(@PathVariable UUID eventId, @Valid @RequestBody CreateEventRequest request) {
+        return eventService.updateEvent(eventId, request);
     }
 
 }

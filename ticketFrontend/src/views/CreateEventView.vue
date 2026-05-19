@@ -804,8 +804,8 @@ function loadSeatsioScript(cdnUrl) {
           <div v-if="currentStep === 2" class="space-y-5">
             <h2 class="text-xl font-black text-slate-900 dark:text-white">Seat setup</h2>
             <div class="grid grid-cols-2 gap-3 max-w-md">
-              <button type="button" :disabled="isEditMode" :class="form.seatProvider === 'INTERNAL' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold disabled:opacity-60" @click="useSeatProvider('INTERNAL')">Internal</button>
-              <button type="button" :disabled="isEditMode" :class="form.seatProvider === 'SEATS_IO' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold disabled:opacity-60" @click="useSeatProvider('SEATS_IO')">seats.io</button>
+              <button type="button" :disabled="isEditMode" :class="form.seatProvider === 'INTERNAL' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold disabled:opacity-60" @click="useSeatProvider('INTERNAL')">Simple</button>
+              <button type="button" :disabled="isEditMode" :class="form.seatProvider === 'SEATS_IO' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold disabled:opacity-60" @click="useSeatProvider('SEATS_IO')">Advanced</button>
             </div>
 
             <div v-if="form.seatProvider === 'SEATS_IO'" class="space-y-5">

@@ -15,6 +15,10 @@ public record BookingEventResponse(
         OffsetDateTime startTime,
         OffsetDateTime saleStartTime,
         OffsetDateTime saleEndTime,
+        String seatProvider,
+        String externalSeatWorkspaceKey,
+        String externalSeatChartKey,
+        String externalSeatEventKey,
         long availableSeats,
         long soldSeats,
         List<BookingSectionResponse> sections

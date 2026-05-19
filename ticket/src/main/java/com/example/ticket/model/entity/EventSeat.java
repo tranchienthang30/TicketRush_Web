@@ -53,6 +53,24 @@ public class EventSeat {
     @Column(nullable = false)
     private Integer version = 0;
 
+    @Column(name = "seat_type_code")
+    private String seatTypeCode;
+
+    @Column(name = "layout_x")
+    private Integer layoutX;
+
+    @Column(name = "layout_y")
+    private Integer layoutY;
+
+    @Column(name = "pair_group")
+    private String pairGroup;
+
+    @Column(name = "is_accessible", nullable = false)
+    private Boolean accessible = false;
+
+    @Column(name = "is_hidden", nullable = false)
+    private Boolean hidden = false;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

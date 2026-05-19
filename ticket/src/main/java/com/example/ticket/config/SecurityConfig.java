@@ -5,13 +5,6 @@ import com.example.ticket.security.OAuth2AuthenticationFailureHandler;
 import com.example.ticket.security.OAuth2AuthenticationSuccessHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 public class SecurityConfig {
@@ -30,15 +23,19 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    org.springframework.security.web.SecurityFilterChain securityFilterChain(
+            org.springframework.security.config.annotation.web.builders.HttpSecurity http
+    ) throws Exception {
         return http
-                .csrf(AbstractHttpConfigurer::disable)
-                .cors(Customizer.withDefaults())
-                .formLogin(AbstractHttpConfigurer::disable)
-                .httpBasic(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer::disable)
+                .cors(org.springframework.security.config.Customizer.withDefaults())
+                .formLogin(org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer::disable)
+                .httpBasic(org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(
+                        org.springframework.security.config.http.SessionCreationPolicy.STATELESS
+                ))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST,
+                        .requestMatchers(org.springframework.http.HttpMethod.POST,
                                 "/api/auth/register",
                                 "/api/auth/login",
                                 "/api/auth/refresh",
@@ -47,18 +44,22 @@ public class SecurityConfig {
                                 "/api/auth/reset-password",
                                 "/api/auth/verify-email",
                                 "/api/v1/payments/webhook").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/organizations/verify", "/api/providers/verify").permitAll()
-                        .requestMatchers(HttpMethod.GET,
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/organizations/verify", "/api/providers/verify").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
                                 "/api/home",
                                 "/api/categories/**",
-                                "/api/events/**").permitAll()
+                                "/api/events/**",
+                                "/uploads/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(oauth2SuccessHandler)
                         .failureHandler(oauth2FailureHandler))
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(
+                        jwtAuthenticationFilter,
+                        org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class
+                )
                 .build();
     }
 }
