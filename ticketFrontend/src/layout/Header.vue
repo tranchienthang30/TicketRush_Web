@@ -388,9 +388,9 @@ onUnmounted(() => window.removeEventListener("click", closeMenu));
           type="button"
           @click.stop="emit('toggle-theme')"
           class="p-2.5 rounded-full hover:bg-white/10 transition text-sm font-bold uppercase tracking-[0.2em]"
-          aria-label="Toggle theme"
+          :aria-label="isDark ? 'Switch to light theme' : 'Switch to dark theme'"
         >
-          {{ isDark ? "Dark" : "Light" }}
+          {{ isDark ? "Light" : "Dark" }}
         </button>
       </div>
     </div>

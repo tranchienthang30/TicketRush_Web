@@ -1,3 +1,51 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-brand-light text-slate-900 antialiased dark:bg-slate-900 dark:text-slate-100;
+  }
+}
+
+html.dark,
+html.dark body,
+html.dark #app {
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+.dark .bg-brand-light {
+  background-color: #0f172a;
+}
+
+.dark .bg-white,
+.dark .bg-slate-100 {
+  background-color: #1e293b;
+}
+
+.dark .bg-slate-50,
+.dark .bg-gray-50 {
+  background-color: #0f172a;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-gray-100,
+.dark .border-gray-200 {
+  border-color: #334155;
+}
+
+.dark .text-brand-navy,
+.dark .text-slate-900,
+.dark .text-slate-800 {
+  color: #f8fafc;
+}
+
+.dark .text-slate-700,
+.dark .text-slate-600,
+.dark .text-slate-500,
+.dark .text-gray-500,
+.dark .text-gray-600 {
+  color: #cbd5e1;
+}

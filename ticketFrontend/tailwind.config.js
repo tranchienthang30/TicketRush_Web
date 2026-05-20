@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: "class",
   content: [
     "./index.html",
     "./src/**/*.{vue,js,ts,jsx,tsx}",
@@ -7,13 +8,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Cài đặt sẵn bộ màu Cam - Xanh Navy đặc trưng của TicketRush
         brand: {
-          navy: '#006494',    // Xanh (dùng cho Header, Footer, Text)
-          orange: '#f97316',  // Cam tươi (dùng cho nút bấm, nhấn mạnh)
-          light: '#f8fafc'    // Trắng xám (dùng cho nền tổng thể)
-        }
-      }
+          navy: "#006494",
+          orange: "#f97316",
+          light: "#f8fafc",
+          dark: "#0f172a",
+        },
+      },
     },
   },
   plugins: [],

@@ -20,13 +20,18 @@ const categoryName = computed(() => {
 
 const heroImage = computed(() => eventDetail.value?.bannerUrl || fallbackImage);
 
-const listingLabel = computed(() => {
-  const listingType = String(eventDetail.value?.listingType || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+const listingTypeValue = computed(() =>
+  String(eventDetail.value?.listingType || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_"),
+);
 
-  if (listingType === "UPCOMING") {
+const listingLabel = computed(() => {
+  if (listingTypeValue.value === "UPCOMING") {
     return "Upcoming";
   }
-  if (listingType === "SPECIAL") {
+  if (listingTypeValue.value === "SPECIAL") {
     return "Special";
   }
   return "Now Showing";
@@ -47,6 +52,7 @@ const priceText = computed(() => {
 const canBook = computed(() => {
   const event = eventDetail.value;
   if (!event) return false;
+  if (listingTypeValue.value === "UPCOMING") return false;
 
   const now = Date.now();
   const saleStart = event.saleStartTime ? new Date(event.saleStartTime).getTime() : null;
@@ -58,6 +64,7 @@ const canBook = computed(() => {
 const bookingUnavailableLabel = computed(() => {
   const event = eventDetail.value;
   if (!event) return "Coming soon";
+  if (listingTypeValue.value === "UPCOMING") return "Coming soon";
 
   const now = Date.now();
   const saleStart = event.saleStartTime ? new Date(event.saleStartTime).getTime() : null;

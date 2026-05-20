@@ -41,6 +41,30 @@ public class CheckoutQueryRepository {
         return rows.stream().findFirst();
     }
 
+    public Optional<EventCheckoutRow> findBookableEvent(UUID eventId) {
+        String sql = """
+                SELECT
+                    e.id,
+                    e.title,
+                    COALESCE(NULLIF(e.location_name, ''), NULLIF(e.city, ''), e.address) AS location
+                FROM events e
+                WHERE e.id = :eventId
+                AND e.status = 'PUBLISHED'
+                AND UPPER(COALESCE(e.listing_type, 'NOW_SHOWING')) <> 'UPCOMING'
+                AND (e.sale_start_time IS NULL OR e.sale_start_time <= now())
+                AND (e.sale_end_time IS NULL OR e.sale_end_time >= now())
+                """;
+
+        List<EventCheckoutRow> rows = jdbcTemplate.query(sql,
+                new MapSqlParameterSource("eventId", eventId),
+                (rs, rowNum) -> new EventCheckoutRow(
+                        rs.getObject("id", UUID.class),
+                        rs.getString("title"),
+                        rs.getString("location")
+                ));
+        return rows.stream().findFirst();
+    }
+
     public List<SeatCheckoutRow> findSeatsByIds(List<UUID> seatIds) {
         if (seatIds == null || seatIds.isEmpty()) {
             return List.of();

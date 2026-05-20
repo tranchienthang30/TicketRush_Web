@@ -44,6 +44,10 @@ function movieTarget(movie) {
   return `/booking?eventId=${movie.id}`;
 }
 
+function movieDetailTarget(movie) {
+  return movie?.slug ? `/events/${movie.slug}` : "/events";
+}
+
 function movieMeta(movie) {
   return [movie.category || "Event", movie.date].filter(Boolean).join("   ");
 }
@@ -89,7 +93,7 @@ const nowShowing = computed(() => {
 
 const upcomingMovies = computed(() =>
   movies.value
-    .filter((movie) => isBookableEvent(movie) && normalizeListingType(movie) === "UPCOMING")
+    .filter((movie) => normalizeListingType(movie) === "UPCOMING")
     .slice(0, 8),
 );
 
@@ -118,7 +122,7 @@ onMounted(loadHome);
 </script>
 
 <template>
-  <div class="home-shell">
+  <div class="home-shell dark:bg-slate-900 dark:text-slate-100">
     <section
       v-if="heroMovie"
       class="hero-wrap"
@@ -278,7 +282,7 @@ onMounted(loadHome);
               <router-link
                 v-for="(movie, index) in upcomingMovies"
                 :key="movie.id"
-                :to="movieTarget(movie)"
+                :to="movieDetailTarget(movie)"
                 class="movie-card"
               >
                 <div class="movie-poster">
@@ -368,7 +372,7 @@ onMounted(loadHome);
   </div>
 </template>
 
-<style scoped>
+<style>
 .home-shell {
   min-height: 100vh;
   background: #f8fafc;
@@ -376,7 +380,7 @@ onMounted(loadHome);
   padding-bottom: 64px;
 }
 
-:global(.dark) .home-shell {
+.dark .home-shell {
   background: #0f172a;
   color: #f8fafc;
 }
@@ -590,7 +594,7 @@ onMounted(loadHome);
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
 }
 
-:global(.dark) .home-state {
+.dark .home-state {
   border-color: #334155;
   background: #1e293b;
   color: #cbd5e1;
@@ -602,7 +606,7 @@ onMounted(loadHome);
   color: #b91c1c;
 }
 
-:global(.dark) .home-error {
+.dark .home-error {
   border-color: rgba(248, 113, 113, 0.36);
   background: rgba(127, 29, 29, 0.22);
   color: #fecaca;
@@ -626,7 +630,7 @@ onMounted(loadHome);
   letter-spacing: -0.02em;
 }
 
-:global(.dark) .section-title {
+.dark .section-title {
   color: #f8fafc;
 }
 
@@ -651,7 +655,7 @@ onMounted(loadHome);
   text-underline-offset: 8px;
 }
 
-:global(.dark) .section-link {
+.dark .section-link {
   color: #f8fafc;
 }
 
@@ -679,7 +683,7 @@ onMounted(loadHome);
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
 }
 
-:global(.dark) .movie-poster {
+.dark .movie-poster {
   border-color: #334155;
   background: #1e293b;
 }
@@ -707,6 +711,10 @@ onMounted(loadHome);
   white-space: nowrap;
 }
 
+.dark .movie-meta {
+  color: #cbd5e1;
+}
+
 .movie-title {
   display: -webkit-box;
   min-height: 42px;
@@ -721,7 +729,7 @@ onMounted(loadHome);
   -webkit-line-clamp: 2;
 }
 
-:global(.dark) .movie-title {
+.dark .movie-title {
   color: #f8fafc;
 }
 
@@ -744,7 +752,7 @@ onMounted(loadHome);
   box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
 }
 
-:global(.dark) .side-tile {
+.dark .side-tile {
   border-color: #334155;
   background: #1e293b;
 }

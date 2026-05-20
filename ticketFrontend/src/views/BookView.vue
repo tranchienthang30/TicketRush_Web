@@ -394,7 +394,7 @@ async function toggleSeatUnit(unit) {
 
 function seatClass(unit) {
   if (unit.seats.some((seat) => seat.status === 'SOLD')) {
-    return 'bg-slate-500 border-slate-700 text-white cursor-not-allowed'
+    return 'bg-slate-500 border-slate-700 text-white cursor-not-allowed dark:bg-slate-600 dark:border-slate-500'
   }
 
   if (isUnitSelected(unit)) {
@@ -402,7 +402,7 @@ function seatClass(unit) {
   }
 
   if (unit.seats.some((seat) => seat.status === 'LOCKED')) {
-    return 'bg-amber-100 border-amber-300 text-amber-700 cursor-not-allowed'
+    return 'bg-amber-100 border-amber-300 text-amber-700 cursor-not-allowed dark:bg-amber-950/60 dark:border-amber-700 dark:text-amber-200'
   }
 
   const leadSeat = unit.seats[0]
@@ -411,18 +411,18 @@ function seatClass(unit) {
   }
 
   if (leadSeat.seatTypeCode === 'COUPLE' || leadSeat.seatTypeCode === 'SWEETBOX') {
-    return 'bg-rose-100 border-rose-300 text-rose-700 hover:bg-rose-200'
+    return 'bg-rose-100 border-rose-300 text-rose-700 hover:bg-rose-200 dark:bg-rose-950/70 dark:border-rose-700 dark:text-rose-200 dark:hover:bg-rose-900'
   }
 
   if (leadSeat.seatTypeCode === 'VIP') {
-    return 'bg-orange-100 border-orange-300 text-orange-700 hover:bg-orange-200'
+    return 'bg-orange-100 border-orange-300 text-orange-700 hover:bg-orange-200 dark:bg-orange-950/70 dark:border-orange-700 dark:text-orange-200 dark:hover:bg-orange-900'
   }
 
   if (leadSeat.seatTypeCode === 'WHEELCHAIR') {
-    return 'bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-200'
+    return 'bg-emerald-100 border-emerald-300 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/70 dark:border-emerald-700 dark:text-emerald-200 dark:hover:bg-emerald-900'
   }
 
-  return 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
+  return 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-700'
 }
 
 function seatUnitStyle(row, unitIndex, unit) {
@@ -715,7 +715,7 @@ function seatsioCdnUrl() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-brand-light pb-20">
+  <div class="min-h-screen bg-brand-light pb-20 dark:bg-slate-900">
     <div class="pointer-events-none fixed right-4 top-24 z-[80] w-[min(90vw,360px)] space-y-2">
       <div
         v-for="toast in bookingToasts"
@@ -723,10 +723,10 @@ function seatsioCdnUrl() {
         class="rounded-2xl border px-4 py-3 text-sm font-bold shadow-lg"
         :class="
           toast.tone === 'error'
-            ? 'border-red-200 bg-red-50 text-red-700'
+            ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/80 dark:text-red-200'
             : toast.tone === 'warn'
-              ? 'border-amber-200 bg-amber-50 text-amber-700'
-              : 'border-blue-200 bg-blue-50 text-blue-700'
+              ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/80 dark:text-amber-200'
+              : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/80 dark:text-blue-200'
         "
       >
         {{ toast.message }}
@@ -734,24 +734,24 @@ function seatsioCdnUrl() {
     </div>
 
     <section class="mx-auto max-w-7xl px-4 pt-8 md:px-8">
-      <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+      <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800 md:p-8">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p class="text-sm font-black uppercase tracking-[0.2em] text-brand-orange">Booking</p>
-            <h1 class="mt-1 text-2xl font-black text-brand-navy md:text-3xl">
+            <h1 class="mt-1 text-2xl font-black text-brand-navy dark:text-white md:text-3xl">
               {{ bookingEvent?.title || 'Choose Seats' }}
             </h1>
-            <p class="mt-2 text-sm text-slate-500">
+            <p class="mt-2 text-sm text-slate-500 dark:text-slate-300">
               {{ eventDateLabel }} - {{ bookingEvent?.hallName || 'Venue Area' }}
             </p>
           </div>
 
           <div class="grid gap-2 text-right">
-            <p class="text-sm font-bold text-slate-700">
-              Start time: <span class="text-brand-navy">{{ showtimeLabel }}</span>
+            <p class="text-sm font-bold text-slate-700 dark:text-slate-200">
+              Start time: <span class="text-brand-navy dark:text-brand-orange">{{ showtimeLabel }}</span>
             </p>
             <p
-              class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700"
+              class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-200"
             >
               Seat selection timer: {{ timeoutLabel }}
             </p>
@@ -763,24 +763,24 @@ function seatsioCdnUrl() {
     <main class="mx-auto mt-6 max-w-7xl px-4 md:px-8">
       <div
         v-if="loading"
-        class="rounded-3xl border border-slate-200 bg-white p-8 text-center font-bold text-slate-500"
+        class="rounded-3xl border border-slate-200 bg-white p-8 text-center font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
       >
         Loading seat map...
       </div>
 
       <div
         v-else-if="error"
-        class="rounded-3xl border border-red-100 bg-red-50 p-8 text-center font-bold text-red-700"
+        class="rounded-3xl border border-red-100 bg-red-50 p-8 text-center font-bold text-red-700 dark:border-red-900 dark:bg-red-950/60 dark:text-red-200"
       >
         {{ error }}
       </div>
 
       <div
         v-else-if="needsEventSelection"
-        class="rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center"
+        class="rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center dark:border-amber-800 dark:bg-amber-950/60"
       >
-        <p class="text-lg font-black text-amber-800">Please select an event first.</p>
-        <p class="mt-2 text-sm font-semibold text-amber-700">
+        <p class="text-lg font-black text-amber-800 dark:text-amber-100">Please select an event first.</p>
+        <p class="mt-2 text-sm font-semibold text-amber-700 dark:text-amber-200">
           Go to Events, choose your event, then continue to Booking.
         </p>
         <button
@@ -797,14 +797,14 @@ function seatsioCdnUrl() {
           <section class="space-y-6">
             <div
               v-if="usesSeatsio"
-              class="rounded-[2rem] border border-slate-200 bg-white px-4 pb-8 pt-6 shadow-sm md:px-8"
+              class="rounded-[2rem] border border-slate-200 bg-white px-4 pb-8 pt-6 shadow-sm dark:border-slate-700 dark:bg-slate-800 md:px-8"
             >
               <div class="mx-auto mb-6 max-w-5xl">
                 <div
                   class="h-4 rounded-full bg-gradient-to-b from-amber-300 via-amber-200 to-transparent"
                 ></div>
                 <p
-                  class="mt-3 text-center text-xs font-black uppercase tracking-[0.3em] text-slate-500"
+                  class="mt-3 text-center text-xs font-black uppercase tracking-[0.3em] text-slate-500 dark:text-slate-300"
                 >
                   Stage / Venue
                 </p>
@@ -818,20 +818,20 @@ function seatsioCdnUrl() {
               </div>
               <div
                 id="seatsio-booking-chart"
-                class="min-h-[620px] overflow-hidden rounded-2xl bg-slate-100"
+                class="min-h-[620px] overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-900"
               ></div>
             </div>
 
             <div
               v-else
-              class="rounded-[2rem] border border-slate-200 bg-white px-4 pb-8 pt-6 shadow-sm md:px-8"
+              class="rounded-[2rem] border border-slate-200 bg-white px-4 pb-8 pt-6 shadow-sm dark:border-slate-700 dark:bg-slate-800 md:px-8"
             >
               <div class="mx-auto mb-10 max-w-5xl">
                 <div
                   class="h-4 rounded-full bg-gradient-to-b from-amber-300 via-amber-200 to-transparent"
                 ></div>
                 <p
-                  class="mt-3 text-center text-xs font-black uppercase tracking-[0.3em] text-slate-500"
+                  class="mt-3 text-center text-xs font-black uppercase tracking-[0.3em] text-slate-500 dark:text-slate-300"
                 >
                   Stage / Venue
                 </p>
@@ -840,7 +840,7 @@ function seatsioCdnUrl() {
               <div class="overflow-x-auto">
                 <div class="mx-auto min-w-[760px] max-w-4xl space-y-2">
                   <div v-for="row in rowGroups" :key="row.rowLabel" class="flex items-center gap-2">
-                    <div class="w-6 text-center text-xs font-black text-slate-500">
+                    <div class="w-6 text-center text-xs font-black text-slate-500 dark:text-slate-300">
                       {{ row.rowLabel }}
                     </div>
                     <div class="grid w-[664px] grid-cols-[repeat(14,minmax(0,1fr))] gap-2">
@@ -864,7 +864,7 @@ function seatsioCdnUrl() {
                         <span v-else>{{ unit.label }}</span>
                       </button>
                     </div>
-                    <div class="w-6 text-center text-xs font-black text-slate-500">
+                    <div class="w-6 text-center text-xs font-black text-slate-500 dark:text-slate-300">
                       {{ row.rowLabel }}
                     </div>
                   </div>
@@ -879,7 +879,7 @@ function seatsioCdnUrl() {
               </div>
 
               <div
-                class="mt-8 flex flex-wrap justify-center gap-5 text-sm font-bold text-slate-700"
+                class="mt-8 flex flex-wrap justify-center gap-5 text-sm font-bold text-slate-700 dark:text-slate-200"
               >
                 <div class="flex items-center gap-2">
                   <span
@@ -892,7 +892,7 @@ function seatsioCdnUrl() {
                 </div>
                 <div v-for="item in seatLegendItems" :key="`${item.label}-${item.color}`" class="flex items-center gap-2">
                   <span
-                    class="inline-block h-4 w-4 rounded border border-slate-300"
+                    class="inline-block h-4 w-4 rounded border border-slate-300 dark:border-slate-600"
                     :style="{ backgroundColor: item.color }"
                   ></span>
                   {{ item.label }}
@@ -900,13 +900,13 @@ function seatsioCdnUrl() {
               </div>
             </div>
 
-            <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
               <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500">
+                  <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
                     {{ usesSeatsio ? 'Selected objects' : 'Selected Seats' }}
                   </p>
-                  <p class="mt-2 text-xl font-black text-brand-navy">
+                  <p class="mt-2 text-xl font-black text-brand-navy dark:text-white">
                     {{
                       usesSeatsio
                         ? selectedSeatsioObjects.length > 0
@@ -919,7 +919,7 @@ function seatsioCdnUrl() {
                   </p>
                 </div>
                 <div>
-                  <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500">Total</p>
+                  <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">Total</p>
                   <p class="mt-2 text-2xl font-black text-brand-orange">
                     {{ formatMoney(totalPrice) }}
                   </p>
@@ -943,8 +943,8 @@ function seatsioCdnUrl() {
           </section>
 
           <aside class="space-y-6">
-            <div class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-              <div class="h-[240px] bg-slate-100">
+            <div class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div class="h-[240px] bg-slate-100 dark:bg-slate-900">
                 <img
                   :src="eventDetail?.bannerUrl || bookingEvent?.bannerUrl || fallbackImage"
                   :alt="eventDetail?.title || bookingEvent?.title"
@@ -956,10 +956,10 @@ function seatsioCdnUrl() {
                 <p class="text-xs font-black uppercase tracking-[0.2em] text-brand-orange">
                   Selected event
                 </p>
-                <h2 class="mt-2 text-2xl font-black text-brand-navy">
+                <h2 class="mt-2 text-2xl font-black text-brand-navy dark:text-white">
                   {{ eventDetail?.title || bookingEvent?.title || 'Event detail' }}
                 </h2>
-                <p class="mt-3 text-sm leading-7 text-slate-600">
+                <p class="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300">
                   {{
                     eventDetail?.description || 'Provider is updating detailed event information.'
                   }}
@@ -967,21 +967,21 @@ function seatsioCdnUrl() {
               </div>
             </div>
 
-            <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-              <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div class="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                 <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Venue</p>
-                <p class="mt-2 text-sm font-black text-slate-800">
+                <p class="mt-2 text-sm font-black text-slate-800 dark:text-white">
                   {{ eventDetail?.locationName || bookingEvent?.location || 'Venue TBA' }}
                 </p>
-                <p v-if="eventDetail?.address" class="mt-1 text-sm text-slate-600">
+                <p v-if="eventDetail?.address" class="mt-1 text-sm text-slate-600 dark:text-slate-300">
                   {{ eventDetail.address }}
                 </p>
-                <p v-if="eventDetail?.city" class="mt-1 text-sm text-slate-600">
+                <p v-if="eventDetail?.city" class="mt-1 text-sm text-slate-600 dark:text-slate-300">
                   {{ eventDetail.city }}
                 </p>
               </div>
 
-              <div class="mt-4 rounded-2xl bg-slate-50 p-4">
+              <div class="mt-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                 <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
                   Information
                 </p>
@@ -994,7 +994,7 @@ function seatsioCdnUrl() {
                     <dt class="text-xs font-black uppercase tracking-[0.1em] text-slate-400">
                       {{ fact.label }}
                     </dt>
-                    <dd class="max-w-[68%] text-right text-sm font-bold text-slate-700">
+                    <dd class="max-w-[68%] text-right text-sm font-bold text-slate-700 dark:text-slate-200">
                       {{ fact.value }}
                     </dd>
                   </div>
@@ -1004,19 +1004,19 @@ function seatsioCdnUrl() {
 
             <div
               v-if="creditsInformation.length"
-              class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
+              class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
             >
               <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Credits</p>
               <dl class="mt-2 grid gap-2">
                 <div
                   v-for="credit in creditsInformation"
                   :key="credit.label"
-                  class="rounded-xl bg-slate-50 px-3 py-2"
+                  class="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-900"
                 >
                   <dt class="text-[11px] font-black uppercase tracking-[0.08em] text-slate-400">
                     {{ credit.label }}
                   </dt>
-                  <dd class="mt-1 text-sm font-bold text-slate-700">{{ credit.value }}</dd>
+                  <dd class="mt-1 text-sm font-bold text-slate-700 dark:text-slate-200">{{ credit.value }}</dd>
                 </div>
               </dl>
             </div>
