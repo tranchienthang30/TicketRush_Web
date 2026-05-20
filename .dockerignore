@@ -1,0 +1,17 @@
+.git/
+.github/
+.vscode/
+docs/
+new.md
+PROJECT_SUMMARY.md
+README.MD
+.env
+.env.*
+docker-compose.yml
+docker-compose.prod.yml
+ticket/target/
+ticket/uploads/
+ticket/package-lock.json
+ticketFrontend/node_modules/
+ticketFrontend/dist/
+**/*.log

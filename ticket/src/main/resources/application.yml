@@ -1,5 +1,6 @@
 server:
   port: 8080
+  forward-headers-strategy: framework
 
 spring:
   application:
@@ -8,15 +9,15 @@ spring:
     time-zone: Asia/Ho_Chi_Minh
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/ticketrush
-    username: ticketrush
-    password: ticketrush
+    url: "${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ticketrush}"
+    username: "${SPRING_DATASOURCE_USERNAME:ticketrush}"
+    password: "${SPRING_DATASOURCE_PASSWORD:ticketrush}"
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: "${JPA_SHOW_SQL:true}"
     properties:
       hibernate:
         format_sql: true
@@ -34,8 +35,8 @@ spring:
 
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: "${REDIS_HOST:localhost}"
+      port: "${REDIS_PORT:6379}"
 
   security:
     oauth2:
@@ -62,6 +63,13 @@ spring:
             enable: "${MAIL_SMTP_STARTTLS:false}"
 
 app:
+  cors:
+    allowed-origins: "${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}"
+
+  cookie:
+    secure: "${COOKIE_SECURE:false}"
+    same-site: "${COOKIE_SAME_SITE:Lax}"
+
   jwt:
     secret: "${JWT_SECRET:this-is-a-demo-secret-key-at-least-32-characters-long}"
     expiration-ms: 86400000
@@ -102,13 +110,13 @@ app:
     sandbox: "${SEATSIO_SANDBOX:false}"
 
 frontend:
-  url: http://localhost:5173
+  url: "${FRONTEND_URL:http://localhost:5173}"
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: when_authorized

@@ -9,18 +9,21 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
-    private static final List<String> ALLOWED_ORIGINS = List.of(
-            "http://localhost:5173",
-            "http://127.0.0.1:5173"
-    );
+    private static final List<String> ALLOWED_METHODS = List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS");
+    private final List<String> allowedOrigins;
     private final String uploadDir;
 
-    public CorsConfig(@Value("${app.upload.dir:uploads}") String uploadDir) {
+    public CorsConfig(
+            @Value("${app.cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}") String allowedOrigins,
+            @Value("${app.upload.dir:uploads}") String uploadDir
+    ) {
+        this.allowedOrigins = parseAllowedOrigins(allowedOrigins);
         this.uploadDir = uploadDir;
     }
 
@@ -28,8 +31,8 @@ public class CorsConfig implements WebMvcConfigurer {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(ALLOWED_ORIGINS);
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        config.setAllowedOrigins(allowedOrigins);
+        config.setAllowedMethods(ALLOWED_METHODS);
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 
@@ -42,8 +45,8 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins(ALLOWED_ORIGINS.toArray(String[]::new))
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
+                .allowedOrigins(allowedOrigins.toArray(String[]::new))
+                .allowedMethods(ALLOWED_METHODS.toArray(String[]::new))
                 .allowedHeaders("*")
                 .allowCredentials(true);
     }
@@ -53,5 +56,12 @@ public class CorsConfig implements WebMvcConfigurer {
         String uploadLocation = Path.of(uploadDir).toAbsolutePath().normalize().toUri().toString();
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(uploadLocation);
+    }
+
+    private List<String> parseAllowedOrigins(String rawOrigins) {
+        return Arrays.stream(rawOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .toList();
     }
 }

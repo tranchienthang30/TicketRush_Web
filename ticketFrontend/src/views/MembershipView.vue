@@ -84,7 +84,7 @@ async function loadMembership() {
     ]);
     plans.value = planData || [];
     currentMembership.value = membershipData;
-  } catch (err) {
+  } catch {
     error.value = "Could not load membership data. Please check the backend API.";
   } finally {
     loading.value = false;
@@ -97,7 +97,7 @@ async function choosePlan(plan) {
 
   try {
     currentMembership.value = await subscribeMembership(plan.id);
-  } catch (err) {
+  } catch {
     error.value = "Could not update membership. Please try again.";
   } finally {
     actionLoadingId.value = null;

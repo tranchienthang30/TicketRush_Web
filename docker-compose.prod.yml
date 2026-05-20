@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ticketrush-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ticketrush}
+      POSTGRES_USER: ${POSTGRES_USER:-ticketrush}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ticketrush_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ticketrush} -d ${POSTGRES_DB:-ticketrush}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ticketrush-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ticketrush_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./ticket
+    image: ticketrush-backend:latest
+    container_name: ticketrush-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ticketrush}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-ticketrush}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      FRONTEND_URL: ${PUBLIC_BASE_URL}
+      CORS_ALLOWED_ORIGINS: ${PUBLIC_BASE_URL}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SAME_SITE: ${COOKIE_SAME_SITE:-Lax}
+      JPA_SHOW_SQL: ${JPA_SHOW_SQL:-false}
+      UPLOAD_DIR: /app/uploads
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID:-}
+      PAYOS_API_KEY: ${PAYOS_API_KEY:-}
+      PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY:-}
+      PAYOS_RETURN_URL: ${PUBLIC_BASE_URL}/checkout/success
+      PAYOS_CANCEL_URL: ${PUBLIC_BASE_URL}/checkout/cancel
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
+      MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-true}
+      MAIL_FROM: ${MAIL_FROM:-}
+      RECAPTCHA_ENABLED: ${RECAPTCHA_ENABLED:-false}
+      RECAPTCHA_SECRET: ${RECAPTCHA_SECRET:-}
+      RECAPTCHA_MIN_SCORE: ${RECAPTCHA_MIN_SCORE:-0.5}
+      SEATSIO_REGION: ${SEATSIO_REGION:-eu}
+      SEATSIO_ADMIN_KEY: ${SEATSIO_ADMIN_KEY:-}
+      SEATSIO_SANDBOX: ${SEATSIO_SANDBOX:-false}
+    volumes:
+      - ticketrush_uploads:/app/uploads
+
+  nginx:
+    build:
+      context: .
+      dockerfile: infra/nginx/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${PUBLIC_BASE_URL}
+        VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
+        VITE_QR_PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+        VITE_SEATSIO_REGION: ${VITE_SEATSIO_REGION:-eu}
+    image: ticketrush-nginx:latest
+    container_name: ticketrush-nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  ticketrush_postgres_data:
+  ticketrush_redis_data:
+  ticketrush_uploads:

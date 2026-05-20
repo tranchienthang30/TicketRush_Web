@@ -22,7 +22,7 @@ async function loadHome() {
   try {
     const data = await getEvents({ size: 24 });
     movies.value = data.content || [];
-  } catch (err) {
+  } catch {
     error.value = "Could not load featured events. Please check the backend API.";
   } finally {
     loading.value = false;

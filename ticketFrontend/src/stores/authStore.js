@@ -41,7 +41,7 @@ export const useAuthStore = defineStore("auth", () => {
       user.value = response.data;
       scheduleCustomerSessionWarnings();
       return response.data;
-    } catch (err) {
+    } catch {
       user.value = null;
       clearSessionTimers();
       return null;

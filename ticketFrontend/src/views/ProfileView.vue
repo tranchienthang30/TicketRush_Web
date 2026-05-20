@@ -59,7 +59,12 @@ async function loadDashboard() {
 
   try {
     dashboard.value = await getProfileDashboard();
+<<<<<<< Updated upstream
   } catch (err) {
+=======
+    resetProfileForm(dashboard.value.profile);
+  } catch {
+>>>>>>> Stashed changes
     error.value = "Could not load profile data. Please check the backend API.";
   } finally {
     loading.value = false;
@@ -90,6 +95,85 @@ async function requestProviderAccess() {
   }
 }
 
+<<<<<<< Updated upstream
+=======
+function startEditingProfile() {
+  resetProfileForm();
+  profileMessage.value = "";
+  profileSaveError.value = "";
+  isEditingProfile.value = true;
+}
+
+function cancelEditingProfile() {
+  resetProfileForm();
+  profileSaveError.value = "";
+  isEditingProfile.value = false;
+}
+
+async function saveProfile() {
+  profileSaveLoading.value = true;
+  profileMessage.value = "";
+  profileSaveError.value = "";
+
+  const payload = {
+    fullName: profileForm.value.fullName.trim(),
+    email: profileForm.value.email.trim(),
+    phone: blankToNull(profileForm.value.phone),
+    gender: blankToNull(profileForm.value.gender),
+    dateOfBirth: profileForm.value.dateOfBirth || null,
+    avatarUrl: blankToNull(profileForm.value.avatarUrl),
+  };
+
+  if (!payload.fullName || !payload.email) {
+    profileSaveError.value = "Full name and email are required.";
+    profileSaveLoading.value = false;
+    return;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+    profileSaveError.value = "Email is invalid.";
+    profileSaveLoading.value = false;
+    return;
+  }
+
+  if (payload.phone && !/^\+?\d{8,15}$/.test(payload.phone)) {
+    profileSaveError.value = "Phone must contain 8-15 digits and may start with +.";
+    profileSaveLoading.value = false;
+    return;
+  }
+
+  try {
+    const updatedProfile = await updateProfile(payload);
+    dashboard.value = {
+      ...dashboard.value,
+      profile: updatedProfile,
+    };
+    authStore.setUser({
+      ...authStore.user,
+      ...updatedProfile,
+    });
+    resetProfileForm(updatedProfile);
+    isEditingProfile.value = false;
+    profileMessage.value = "Profile updated.";
+  } catch (err) {
+    profileSaveError.value = getErrorMessage(err, "Unable to update profile.");
+  } finally {
+    profileSaveLoading.value = false;
+  }
+}
+
+function resetProfileForm(source = profile.value) {
+  profileForm.value = {
+    fullName: source?.fullName || "",
+    email: source?.email || "",
+    phone: source?.phone || "",
+    gender: source?.gender || "",
+    dateOfBirth: source?.dateOfBirth || "",
+    avatarUrl: source?.avatarUrl || "",
+  };
+}
+
+>>>>>>> Stashed changes
 function initials(value) {
   return value
     .split(" ")

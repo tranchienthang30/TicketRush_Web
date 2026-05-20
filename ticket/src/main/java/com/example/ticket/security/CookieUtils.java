@@ -15,21 +15,35 @@ public final class CookieUtils {
     }
 
     public static ResponseCookie createHttpOnlyCookie(String name, String value, Duration maxAge) {
+        return createHttpOnlyCookie(name, value, maxAge, false, "Lax");
+    }
+
+    public static ResponseCookie createHttpOnlyCookie(
+            String name,
+            String value,
+            Duration maxAge,
+            boolean secure,
+            String sameSite
+    ) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
-                .secure(false)
+                .secure(secure)
                 .path("/")
-                .sameSite("Lax")
+                .sameSite(sameSite)
                 .maxAge(maxAge)
                 .build();
     }
 
     public static ResponseCookie clearCookie(String name) {
+        return clearCookie(name, false, "Lax");
+    }
+
+    public static ResponseCookie clearCookie(String name, boolean secure, String sameSite) {
         return ResponseCookie.from(name, "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(secure)
                 .path("/")
-                .sameSite("Lax")
+                .sameSite(sameSite)
                 .maxAge(Duration.ZERO)
                 .build();
     }

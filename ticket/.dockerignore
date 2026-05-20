@@ -1,0 +1,6 @@
+target/
+uploads/
+.git/
+.github/
+*.log
+package-lock.json

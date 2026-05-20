@@ -1,3 +1,9 @@
+<script setup>
+defineOptions({
+  name: "AppFooter",
+});
+</script>
+
 <template>
   <footer class="bg-brand-navy text-white pt-12 pb-6 px-4 md:px-8">
     <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-10">

@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ticketrush
+          POSTGRES_USER: ticketrush
+          POSTGRES_PASSWORD: ticketrush
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ticketrush -d ticketrush"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: ticket
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run Maven tests
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/ticketrush
+          SPRING_DATASOURCE_USERNAME: ticketrush
+          SPRING_DATASOURCE_PASSWORD: ticketrush
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          JWT_SECRET: ci-secret-key-at-least-32-characters-long
+          GOOGLE_CLIENT_ID: ci
+          GOOGLE_CLIENT_SECRET: ci
+          JPA_SHOW_SQL: "false"
+        run: |
+          chmod +x mvnw
+          ./mvnw -B clean test
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ticketFrontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ticketFrontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check lint
+        run: npm run lint:check
+
+      - name: Build
+        env:
+          VITE_API_BASE_URL: http://localhost
+          VITE_QR_PUBLIC_BASE_URL: http://localhost
+          VITE_SEATSIO_REGION: eu
+        run: npm run build

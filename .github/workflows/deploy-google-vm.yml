@@ -1,0 +1,44 @@
+name: Deploy Google VM
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-google-vm
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Compute Engine
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Prepare SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GCP_VM_SSH_PRIVATE_KEY }}" > ~/.ssh/ticketrush_deploy_key
+          chmod 600 ~/.ssh/ticketrush_deploy_key
+          ssh-keyscan -H "${{ secrets.GCP_VM_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy with Docker Compose
+        env:
+          VM_USER: ${{ secrets.GCP_VM_USER }}
+          VM_HOST: ${{ secrets.GCP_VM_HOST }}
+          DEPLOY_PATH: ${{ secrets.GCP_VM_DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/ticketrush_deploy_key "$VM_USER@$VM_HOST" "
+            set -e
+            cd '$DEPLOY_PATH'
+            git fetch origin main
+            git pull --ff-only origin main
+            docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+            docker image prune -f
+          "
