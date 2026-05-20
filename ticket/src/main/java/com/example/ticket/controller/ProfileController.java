@@ -8,6 +8,7 @@ import com.example.ticket.dto.TicketSummaryResponse;
 import com.example.ticket.dto.UpdateProfileRequest;
 import com.example.ticket.service.CurrentUserService;
 import com.example.ticket.service.ProfileService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -41,7 +42,7 @@ public class ProfileController {
     @PutMapping
     public ProfileResponse updateProfile(
             @RequestHeader(name = "X-User-Id", required = false) UUID userId,
-            @RequestBody UpdateProfileRequest request
+            @Valid @RequestBody UpdateProfileRequest request
     ) {
         return profileService.updateProfile(currentUserService.resolve(userId), request);
     }

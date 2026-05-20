@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { getProfileDashboard } from "../api/ticketRushApi";
+import { getProfileDashboard, updateProfile } from "../api/ticketRushApi";
 import * as providerApi from "@/api/provider.api";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -10,6 +10,18 @@ const loading = ref(true);
 const error = ref("");
 const providerActionLoading = ref(false);
 const providerMessage = ref("");
+const isEditingProfile = ref(false);
+const profileSaveLoading = ref(false);
+const profileMessage = ref("");
+const profileSaveError = ref("");
+const profileForm = ref({
+  fullName: "",
+  email: "",
+  phone: "",
+  gender: "",
+  dateOfBirth: "",
+  avatarUrl: "",
+});
 
 const profile = computed(() => dashboard.value?.profile || {});
 const membership = computed(() => dashboard.value?.membership || null);
@@ -31,6 +43,8 @@ const displayProfile = computed(() => ({
 const accountDetails = computed(() => [
   { label: "Primary email", value: displayProfile.value.email || "Not updated" },
   { label: "Phone number", value: displayProfile.value.phone },
+  { label: "Gender", value: profile.value.gender || "Not updated" },
+  { label: "Date of birth", value: profile.value.dateOfBirth ? formatDate(profile.value.dateOfBirth) : "Not updated" },
   { label: "Role", value: profile.value.role || "CUSTOMER" },
   { label: "Email status", value: profile.value.emailVerified ? "Verified" : "Verification pending" },
   { label: "Provider status", value: providerStatusLabel.value },
@@ -59,6 +73,7 @@ async function loadDashboard() {
 
   try {
     dashboard.value = await getProfileDashboard();
+    resetProfileForm(dashboard.value.profile);
   } catch (err) {
     error.value = "Could not load profile data. Please check the backend API.";
   } finally {
@@ -90,6 +105,82 @@ async function requestProviderAccess() {
   }
 }
 
+function startEditingProfile() {
+  resetProfileForm();
+  profileMessage.value = "";
+  profileSaveError.value = "";
+  isEditingProfile.value = true;
+}
+
+function cancelEditingProfile() {
+  resetProfileForm();
+  profileSaveError.value = "";
+  isEditingProfile.value = false;
+}
+
+async function saveProfile() {
+  profileSaveLoading.value = true;
+  profileMessage.value = "";
+  profileSaveError.value = "";
+
+  const payload = {
+    fullName: profileForm.value.fullName.trim(),
+    email: profileForm.value.email.trim(),
+    phone: blankToNull(profileForm.value.phone),
+    gender: blankToNull(profileForm.value.gender),
+    dateOfBirth: profileForm.value.dateOfBirth || null,
+    avatarUrl: blankToNull(profileForm.value.avatarUrl),
+  };
+
+  if (!payload.fullName || !payload.email) {
+    profileSaveError.value = "Full name and email are required.";
+    profileSaveLoading.value = false;
+    return;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+    profileSaveError.value = "Email is invalid.";
+    profileSaveLoading.value = false;
+    return;
+  }
+
+  if (payload.phone && !/^\+?\d{8,15}$/.test(payload.phone)) {
+    profileSaveError.value = "Phone must contain 8-15 digits and may start with +.";
+    profileSaveLoading.value = false;
+    return;
+  }
+
+  try {
+    const updatedProfile = await updateProfile(payload);
+    dashboard.value = {
+      ...dashboard.value,
+      profile: updatedProfile,
+    };
+    authStore.setUser({
+      ...(authStore.user || {}),
+      ...updatedProfile,
+    });
+    resetProfileForm(updatedProfile);
+    isEditingProfile.value = false;
+    profileMessage.value = "Profile updated.";
+  } catch (err) {
+    profileSaveError.value = getErrorMessage(err, "Unable to update profile.");
+  } finally {
+    profileSaveLoading.value = false;
+  }
+}
+
+function resetProfileForm(source = profile.value) {
+  profileForm.value = {
+    fullName: source?.fullName || "",
+    email: source?.email || "",
+    phone: source?.phone || "",
+    gender: source?.gender || "",
+    dateOfBirth: source?.dateOfBirth || "",
+    avatarUrl: source?.avatarUrl || "",
+  };
+}
+
 function initials(value) {
   return value
     .split(" ")
@@ -110,6 +201,19 @@ function formatDate(value) {
     day: "2-digit",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function blankToNull(value) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function getErrorMessage(err, fallback) {
+  return (
+    err.response?.data?.message ||
+    Object.values(err.response?.data?.details || {})[0] ||
+    fallback
+  );
 }
 
 onMounted(loadDashboard);
@@ -227,13 +331,133 @@ onMounted(loadDashboard);
                     Personal details
                   </h2>
                 </div>
-                <span
-                  class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:bg-slate-900 dark:text-slate-300"
-                >
-                  Member since {{ displayProfile.memberSince }}
-                </span>
+                <div class="flex flex-col items-end gap-3">
+                  <span
+                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:bg-slate-900 dark:text-slate-300"
+                  >
+                    Member since {{ displayProfile.memberSince }}
+                  </span>
+                  <button
+                    v-if="!isEditingProfile"
+                    type="button"
+                    class="rounded-2xl border border-brand-orange px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-brand-orange transition hover:bg-brand-orange hover:text-white"
+                    @click="startEditingProfile"
+                  >
+                    Edit
+                  </button>
+                </div>
               </div>
-              <div class="mt-6 space-y-4">
+
+              <p
+                v-if="profileMessage"
+                class="mt-5 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-bold text-green-700"
+              >
+                {{ profileMessage }}
+              </p>
+
+              <p
+                v-if="profileSaveError"
+                class="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700"
+              >
+                {{ profileSaveError }}
+              </p>
+
+              <form v-if="isEditingProfile" class="mt-6 space-y-4" @submit.prevent="saveProfile">
+                <label class="block">
+                  <span class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                    Full name
+                  </span>
+                  <input
+                    v-model.trim="profileForm.fullName"
+                    type="text"
+                    autocomplete="name"
+                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  />
+                </label>
+
+                <label class="block">
+                  <span class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                    Email
+                  </span>
+                  <input
+                    v-model.trim="profileForm.email"
+                    type="email"
+                    autocomplete="email"
+                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  />
+                </label>
+
+                <label class="block">
+                  <span class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                    Phone number
+                  </span>
+                  <input
+                    v-model.trim="profileForm.phone"
+                    type="tel"
+                    autocomplete="tel"
+                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  />
+                </label>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <label class="block">
+                    <span class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                      Gender
+                    </span>
+                    <select
+                      v-model="profileForm.gender"
+                      class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    >
+                      <option value="">Not updated</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </label>
+
+                  <label class="block">
+                    <span class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                      Date of birth
+                    </span>
+                    <input
+                      v-model="profileForm.dateOfBirth"
+                      type="date"
+                      class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    />
+                  </label>
+                </div>
+
+                <label class="block">
+                  <span class="block text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                    Avatar URL
+                  </span>
+                  <input
+                    v-model.trim="profileForm.avatarUrl"
+                    type="url"
+                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-brand-orange focus:ring-4 focus:ring-brand-orange/15 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  />
+                </label>
+
+                <div class="flex flex-col gap-3 pt-2 sm:flex-row">
+                  <button
+                    type="submit"
+                    :disabled="profileSaveLoading"
+                    class="inline-flex justify-center rounded-2xl bg-brand-orange px-5 py-3 text-sm font-black uppercase tracking-[0.18em] text-white transition hover:bg-orange-600 disabled:opacity-60"
+                  >
+                    {{ profileSaveLoading ? "Saving..." : "Save changes" }}
+                  </button>
+                  <button
+                    type="button"
+                    :disabled="profileSaveLoading"
+                    class="inline-flex justify-center rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black uppercase tracking-[0.18em] text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+                    @click="cancelEditingProfile"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+
+              <div v-else class="mt-6 space-y-4">
                 <div
                   v-for="detail in accountDetails"
                   :key="detail.label"
