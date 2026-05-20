@@ -57,7 +57,7 @@ const canBook = computed(() => {
   }
 
   const tag = String(props.event.tag || "").trim().toUpperCase();
-  return !["COMING SOON", "UPCOMING", "SOLD OUT"].includes(tag);
+  return !["COMING SOON", "SOLD OUT"].includes(tag);
 });
 
 const detailPath = computed(() => (props.event.slug ? `/events/${props.event.slug}` : "/events"));

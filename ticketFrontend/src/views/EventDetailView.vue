@@ -52,7 +52,6 @@ const priceText = computed(() => {
 const canBook = computed(() => {
   const event = eventDetail.value;
   if (!event) return false;
-  if (listingTypeValue.value === "UPCOMING") return false;
 
   const now = Date.now();
   const saleStart = event.saleStartTime ? new Date(event.saleStartTime).getTime() : null;
@@ -64,7 +63,6 @@ const canBook = computed(() => {
 const bookingUnavailableLabel = computed(() => {
   const event = eventDetail.value;
   if (!event) return "Coming soon";
-  if (listingTypeValue.value === "UPCOMING") return "Coming soon";
 
   const now = Date.now();
   const saleStart = event.saleStartTime ? new Date(event.saleStartTime).getTime() : null;

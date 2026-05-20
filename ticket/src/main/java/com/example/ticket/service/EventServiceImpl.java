@@ -626,9 +626,6 @@ public class EventServiceImpl implements EventService {
     private boolean isBookingAvailable(EventQueryRepository.EventRow row) {
         OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
 
-        if ("UPCOMING".equals(normalizeListingType(row.listingType()))) {
-            return false;
-        }
         if (row.saleStartTime() != null && row.saleStartTime().isAfter(now)) {
             return false;
         }

@@ -140,7 +140,6 @@ public class EventQueryRepository {
                 LEFT JOIN cinema_halls ch ON ch.id = e.hall_id
                 WHERE e.id = :eventId
                 AND e.status = 'PUBLISHED'
-                AND UPPER(COALESCE(e.listing_type, 'NOW_SHOWING')) <> 'UPCOMING'
                 AND (e.sale_start_time IS NULL OR e.sale_start_time <= now())
                 AND (e.sale_end_time IS NULL OR e.sale_end_time >= now())
                 """;
