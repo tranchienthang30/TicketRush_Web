@@ -15,9 +15,14 @@ public class SeatLifecycleScheduler {
     private static final ZoneId APP_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final CheckoutQueryRepository checkoutRepository;
+    private final VirtualQueueService virtualQueueService;
 
-    public SeatLifecycleScheduler(CheckoutQueryRepository checkoutRepository) {
+    public SeatLifecycleScheduler(
+            CheckoutQueryRepository checkoutRepository,
+            VirtualQueueService virtualQueueService
+    ) {
         this.checkoutRepository = checkoutRepository;
+        this.virtualQueueService = virtualQueueService;
     }
 
     @Scheduled(
@@ -27,11 +32,16 @@ public class SeatLifecycleScheduler {
     @Transactional
     public void expirePendingOrdersAndReleaseSeatLocks() {
         OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
+        var expiredLockOwners = checkoutRepository.findExpiredSeatLockOwners(now);
         int expiredOrders = checkoutRepository.expirePendingOrders(now);
         int releasedLocks = checkoutRepository.releaseExpiredSeatLocks(now);
+        for (CheckoutQueryRepository.ExpiredSeatLockOwnerRow row : expiredLockOwners) {
+            virtualQueueService.registerExpiredSeatLockStrike(row.eventId(), row.userId(), row.seatCount());
+        }
 
         if (expiredOrders > 0 || releasedLocks > 0) {
-            log.info("Seat lifecycle scan: expiredOrders={}, releasedLocks={}", expiredOrders, releasedLocks);
+            log.info("Seat lifecycle scan: expiredOrders={}, releasedLocks={}, penalizedUsers={}",
+                    expiredOrders, releasedLocks, expiredLockOwners.size());
         }
     }
 }

@@ -50,7 +50,7 @@ public class CheckoutService {
             PayOSPaymentService payOSPaymentService,
             PaymentConfirmationEmailService paymentConfirmationEmailService,
             VirtualQueueService virtualQueueService,
-            @Value("${app.booking.lock-minutes:1}") int bookingLockMinutes
+            @Value("${app.booking.lock-minutes:10}") int bookingLockMinutes
     ) {
         this.checkoutRepository = checkoutRepository;
         this.payOSPaymentService = payOSPaymentService;
@@ -140,6 +140,39 @@ public class CheckoutService {
     }
 
     @Transactional
+    public void cancelPayOSPayment(UUID userId, long orderCode) {
+        CheckoutQueryRepository.OrderStatusRow order = checkoutRepository
+                .findOrderStatusByPayOSOrderCodeAndUserId(orderCode, userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Order not found for this payment code"));
+
+        if (isSuccessfulOrder(order.status())) {
+            throw new ApiException(HttpStatus.CONFLICT, "Order is already paid");
+        }
+
+        if ("CANCELLED".equalsIgnoreCase(order.status()) || "EXPIRED".equalsIgnoreCase(order.status())) {
+            checkoutRepository.releaseSeatLocksForOrder(order.orderId());
+            return;
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
+        int updated = checkoutRepository.markOrderCancelledIfPending(order.orderId(), now);
+        if (updated == 0) {
+            CheckoutQueryRepository.OrderStatusRow latest = checkoutRepository.findOrderStatus(order.orderId())
+                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Order not found"));
+            if (isSuccessfulOrder(latest.status())) {
+                throw new ApiException(HttpStatus.CONFLICT, "Order is already paid");
+            }
+            if ("CANCELLED".equalsIgnoreCase(latest.status()) || "EXPIRED".equalsIgnoreCase(latest.status())) {
+                checkoutRepository.releaseSeatLocksForOrder(order.orderId());
+                return;
+            }
+            throw new ApiException(HttpStatus.CONFLICT, "Order is not in pending state");
+        }
+
+        checkoutRepository.releaseSeatLocksForOrder(order.orderId());
+    }
+
+    @Transactional
     public CheckoutResultResponse confirm(UUID userId, CheckoutConfirmRequest request) {
         virtualQueueService.requireAccess(request.eventId(), userId);
         CheckoutEvaluation evaluation = evaluate(
@@ -151,11 +184,10 @@ public class CheckoutService {
                 true
         );
         OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
-        OffsetDateTime expiresAt = now.plusMinutes(bookingLockMinutes);
+        OffsetDateTime expiresAt = resolveCheckoutExpiryForConfirm(evaluation.seats(), now);
         UUID orderId = UUID.randomUUID();
         boolean payWithBankQr = PAYMENT_METHOD_BANK_QR.equalsIgnoreCase(request.paymentMethod());
         Long payosOrderCode = payWithBankQr ? payOSPaymentService.generateOrderCode(orderId) : null;
-        List<UUID> seatIds = evaluation.seats().stream().map(CheckoutQueryRepository.SeatCheckoutRow::id).toList();
 
         checkoutRepository.insertOrder(
                 orderId,
@@ -201,10 +233,6 @@ public class CheckoutService {
         }
 
         if (payWithBankQr) {
-            int lockedCount = checkoutRepository.setSeatLocks(userId, evaluation.event().id(), seatIds, expiresAt);
-            if (lockedCount != seatIds.size()) {
-                throw new ApiException(HttpStatus.CONFLICT, "One or more seats cannot be locked right now");
-            }
             String checkoutUrl = payOSPaymentService.createCheckoutUrl(
                     orderId,
                     payosOrderCode,
@@ -485,8 +513,31 @@ public class CheckoutService {
                 evaluation.totalAmount(),
                 formatMoney(evaluation.totalAmount()),
                 evaluation.membershipApplied(),
-                evaluation.voucher() == null ? null : evaluation.voucher().code()
+                evaluation.voucher() == null ? null : evaluation.voucher().code(),
+                resolveSeatLockExpiry(evaluation.seats())
         );
+    }
+
+    private OffsetDateTime resolveSeatLockExpiry(List<CheckoutQueryRepository.SeatCheckoutRow> seats) {
+        return seats.stream()
+                .map(CheckoutQueryRepository.SeatCheckoutRow::lockExpiresAt)
+                .filter(value -> value != null)
+                .min(OffsetDateTime::compareTo)
+                .orElse(null);
+    }
+
+    private OffsetDateTime resolveCheckoutExpiryForConfirm(
+            List<CheckoutQueryRepository.SeatCheckoutRow> seats,
+            OffsetDateTime now
+    ) {
+        OffsetDateTime minLockExpiry = resolveSeatLockExpiry(seats);
+        if (minLockExpiry == null) {
+            throw new ApiException(HttpStatus.CONFLICT, "Selected seats are not locked anymore. Please reselect seats.");
+        }
+        if (!minLockExpiry.isAfter(now.plusSeconds(5))) {
+            throw new ApiException(HttpStatus.CONFLICT, "Seat lock is about to expire. Please reselect seats.");
+        }
+        return minLockExpiry;
     }
 
     private String normalizeVoucherCode(String value) {

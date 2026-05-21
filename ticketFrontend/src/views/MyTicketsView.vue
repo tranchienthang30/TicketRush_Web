@@ -20,6 +20,7 @@ const statusOptions = [
 const statusLabelMap = {
   PENDING: "Pending",
   PAID: "Paid",
+  SUCCESS: "Paid",
   EXPIRED: "Expired",
   CANCELLED: "Cancelled",
 };
@@ -27,6 +28,7 @@ const statusLabelMap = {
 const statusClassMap = {
   PENDING: "bg-amber-100 text-amber-700 border-amber-200",
   PAID: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  SUCCESS: "bg-emerald-100 text-emerald-700 border-emerald-200",
   EXPIRED: "bg-slate-200 text-slate-700 border-slate-300",
   CANCELLED: "bg-red-100 text-red-700 border-red-200",
 };
