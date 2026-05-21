@@ -74,7 +74,7 @@ async function loadDashboard() {
   try {
     dashboard.value = await getProfileDashboard();
     resetProfileForm(dashboard.value.profile);
-  } catch (err) {
+  } catch {
     error.value = "Could not load profile data. Please check the backend API.";
   } finally {
     loading.value = false;
@@ -157,7 +157,7 @@ async function saveProfile() {
       profile: updatedProfile,
     };
     authStore.setUser({
-      ...(authStore.user || {}),
+      ...authStore.user,
       ...updatedProfile,
     });
     resetProfileForm(updatedProfile);
