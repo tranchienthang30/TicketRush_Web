@@ -8,6 +8,7 @@ import com.example.ticket.dto.request.SeatsioEventCreateRequest;
 import com.example.ticket.dto.BookingEventResponse;
 import com.example.ticket.dto.BookingSectionResponse;
 import com.example.ticket.dto.BookingSeatResponse;
+import com.example.ticket.config.CacheNames;
 import com.example.ticket.dto.CategoryEventsResponse;
 import com.example.ticket.dto.CategoryResponse;
 import com.example.ticket.dto.EventCardResponse;
@@ -50,6 +51,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -94,6 +98,13 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.USER_HOME, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENTS_GROUPED, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENTS_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENT_BY_SLUG, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENTS_LEGACY, allEntries = true)
+    })
     public EventResponse createEvent(CreateEventRequest request) {
         User user = currentUser();
         if (user.getRole() != UserRole.PROVIDER && user.getRole() != UserRole.ADMIN) {
@@ -172,6 +183,13 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.USER_HOME, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENTS_GROUPED, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENTS_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENT_BY_SLUG, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENTS_LEGACY, allEntries = true)
+    })
     public EventResponse updateEvent(UUID eventId, CreateEventRequest request) {
         User user = currentUser();
         Event event = ownedEvent(eventId, user);
@@ -302,11 +320,12 @@ public class EventServiceImpl implements EventService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.USER_EVENTS_LEGACY, condition = "@userCachePolicy.allowCache()")
     public List<EventResponse> publicEvents() {
         return eventRepository.findByStatusOrderByStartTimeAsc(EventStatus.PUBLISHED)
                 .stream()
                 .map(this::toResponse)
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     @Override
@@ -316,11 +335,12 @@ public class EventServiceImpl implements EventService {
         return eventRepository.findByProviderIdOrderByCreatedAtDesc(userId)
                 .stream()
                 .map(this::toResponse)
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.USER_EVENT_BY_SLUG, key = "#slug", condition = "@userCachePolicy.allowCache()")
     public EventResponse eventBySlug(String slug) {
         return toResponse(eventRepository.findBySlug(slug)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "Event does not exist")));
@@ -334,6 +354,7 @@ public class EventServiceImpl implements EventService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.USER_EVENTS_GROUPED, key = "#limitPerCategory", condition = "@userCachePolicy.allowCache()")
     public List<CategoryEventsResponse> getGroupedEvents(int limitPerCategory) {
         int safeLimit = clamp(limitPerCategory, 1, 12);
 
@@ -347,11 +368,12 @@ public class EventServiceImpl implements EventService {
                         toEventCards(eventQueryRepository.findPublishedEventsByCategory(category.id(), safeLimit))
                 ))
                 .filter(category -> !category.events().isEmpty())
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.USER_EVENTS_SEARCH, condition = "@userCachePolicy.allowCache()")
     public EventPageResponse searchEvents(Long categoryId, String query, String city, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = clamp(size, 1, 50);
@@ -563,7 +585,9 @@ public class EventServiceImpl implements EventService {
     }
 
     private List<EventCardResponse> toEventCards(List<EventQueryRepository.EventRow> rows) {
-        return rows.stream().map(this::toEventCard).toList();
+        return rows.stream()
+                .map(this::toEventCard)
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     private EventCardResponse toEventCard(EventQueryRepository.EventRow row) {

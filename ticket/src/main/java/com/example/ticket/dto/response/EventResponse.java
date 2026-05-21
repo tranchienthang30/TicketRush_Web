@@ -6,8 +6,10 @@ import com.example.ticket.model.entity.EventSection;
 import com.example.ticket.model.enums.EventStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public record EventResponse(
         UUID id,
@@ -44,7 +46,7 @@ public record EventResponse(
         List<InternalSeatRowResponse> internalSeatRows
 ) {
     public static EventResponse from(Event event, List<EventSection> sections, long totalSeats) {
-        return from(event, sections, totalSeats, List.of());
+        return from(event, sections, totalSeats, new ArrayList<>());
     }
 
     public static EventResponse from(Event event, List<EventSection> sections, long totalSeats, List<EventSeat> seats) {
@@ -83,14 +85,16 @@ public record EventResponse(
                 event.getExternalSeatEventKey(),
                 totalSeats,
                 minPrice,
-                sections.stream().map(SectionResponse::from).toList(),
+                sections.stream()
+                        .map(SectionResponse::from)
+                        .collect(Collectors.toCollection(ArrayList::new)),
                 buildInternalSeatRows(event, sections, seats)
         );
     }
 
     private static List<InternalSeatRowResponse> buildInternalSeatRows(Event event, List<EventSection> sections, List<EventSeat> seats) {
         if (!"INTERNAL".equals(event.getSeatProvider()) || seats == null || seats.isEmpty()) {
-            return List.of();
+            return new ArrayList<>();
         }
         java.util.Map<UUID, EventSection> sectionById = sections.stream()
                 .collect(java.util.stream.Collectors.toMap(EventSection::getId, section -> section));
@@ -106,7 +110,7 @@ public record EventResponse(
                 .map(entry -> {
                     List<EventSeat> rowSeats = entry.getValue().stream()
                             .sorted(java.util.Comparator.comparing(EventSeat::getSeatNumber))
-                            .toList();
+                            .collect(Collectors.toCollection(ArrayList::new));
                     int seatCount = rowSeats.stream().mapToInt(EventSeat::getSeatNumber).max().orElse(0);
                     return new InternalSeatRowResponse(
                             entry.getKey(),
@@ -114,12 +118,12 @@ public record EventResponse(
                             compactRanges(rowSeats, sectionById)
                     );
                 })
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     private static List<InternalSeatRangeResponse> compactRanges(List<EventSeat> rowSeats, java.util.Map<UUID, EventSection> sectionById) {
         if (rowSeats.isEmpty()) {
-            return List.of();
+            return new ArrayList<>();
         }
         java.util.ArrayList<InternalSeatRangeResponse> ranges = new java.util.ArrayList<>();
         EventSeat start = rowSeats.get(0);

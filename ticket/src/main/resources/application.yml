@@ -38,6 +38,9 @@ spring:
       host: "${REDIS_HOST:localhost}"
       port: "${REDIS_PORT:6379}"
 
+  cache:
+    type: redis
+
   security:
     oauth2:
       client:

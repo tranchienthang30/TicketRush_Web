@@ -1,5 +1,6 @@
 package com.example.ticket.service;
 
+import com.example.ticket.config.CacheNames;
 import com.example.ticket.dto.response.AdminDashboardResponse;
 import com.example.ticket.dto.response.AdminSystemResponse;
 import com.example.ticket.dto.response.UserResponse;
@@ -14,6 +15,8 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.boot.actuate.health.HealthComponent;
 import org.springframework.boot.actuate.health.HealthEndpoint;
 import org.springframework.http.HttpStatus;
@@ -98,6 +101,13 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.USER_HOME, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENTS_GROUPED, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENTS_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENT_BY_SLUG, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_EVENTS_LEGACY, allEntries = true)
+    })
     public void deleteUser(UUID userId) {
         JwtPrincipal admin = requireAdmin();
         if (admin.userId().equals(userId)) {
