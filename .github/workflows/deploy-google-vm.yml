@@ -4,14 +4,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
-    branches:
-      - main
-      - luuLoad
   workflow_dispatch:
     inputs:
       branch:
@@ -20,14 +12,13 @@ on:
         default: luuLoad
 
 concurrency:
-  group: deploy-google-vm-${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.event.workflow_run.head_branch }}
+  group: deploy-google-vm-${{ inputs.branch }}
   cancel-in-progress: true
 
 jobs:
   deploy:
     name: Deploy to Compute Engine
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Prepare SSH
@@ -42,7 +33,7 @@ jobs:
           VM_USER: ${{ secrets.GCP_VM_USER }}
           VM_HOST: ${{ secrets.GCP_VM_HOST }}
           DEPLOY_PATH: ${{ secrets.GCP_VM_DEPLOY_PATH }}
-          DEPLOY_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.event.workflow_run.head_branch }}
+          DEPLOY_BRANCH: ${{ inputs.branch }}
         run: |
           ssh -i ~/.ssh/ticketrush_deploy_key "$VM_USER@$VM_HOST" "
             set -e
