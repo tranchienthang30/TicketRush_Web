@@ -3,6 +3,16 @@ import { useAuthStore } from "@/stores/authStore";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  scrollBehavior(to) {
+    if (to.hash) {
+      return {
+        el: to.hash,
+        behavior: "smooth",
+      };
+    }
+
+    return { left: 0, top: 0 };
+  },
   routes: [
     { path: "/", name: "home", component: () => import("@/views/HomeView.vue"), meta: { customerSurface: true } },
     { path: "/events", name: "events", component: () => import("@/views/EventsView.vue"), meta: { customerSurface: true } },
