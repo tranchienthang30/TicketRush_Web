@@ -6,6 +6,8 @@ import {
   getBookingEvent,
   getCategories,
   getEventBySlug,
+  getVirtualQueueStatus,
+  joinVirtualQueue,
   lockBookingSeats,
   releaseBookingSeats,
 } from '../api/ticketRushApi'
@@ -13,6 +15,7 @@ import {
 const CHECKOUT_STORAGE_KEY = 'ticketrush_checkout_payload'
 const SELECT_TIMEOUT_SECONDS = 60
 const SEAT_POLL_INTERVAL_MS = 3000
+const QUEUE_POLL_INTERVAL_MS = 5000
 const TOAST_DURATION_MS = 3600
 const MAX_TOASTS = 4
 
@@ -30,11 +33,14 @@ const selectedSeatIds = ref([])
 const seatActionLoading = ref(false)
 const seatActionError = ref('')
 const bookingToasts = ref([])
+const queueStatus = ref(null)
+const queueError = ref('')
 const selectedSeatsioObjects = ref([])
 const seatsioRenderError = ref('')
 const timerSeconds = ref(SELECT_TIMEOUT_SECONDS)
 let timerHandle = null
 let pollHandle = null
+let queuePollHandle = null
 let toastSequence = 0
 let seatStatusSnapshot = new Map()
 let seatsioChart = null
@@ -162,6 +168,24 @@ const categoryName = computed(() => {
     return ''
   }
   return categories.value.find((category) => Number(category.id) === categoryId)?.name || ''
+})
+
+const isWaitingRoom = computed(() => queueStatus.value?.status === 'WAITING')
+const queuePositionLabel = computed(() => {
+  const position = Number(queueStatus.value?.position)
+  return Number.isFinite(position) && position > 0 ? position.toLocaleString('vi-VN') : '...'
+})
+const queueAheadCount = computed(() => {
+  const position = Number(queueStatus.value?.position)
+  return Number.isFinite(position) && position > 1 ? position - 1 : 0
+})
+const queueProgressPercent = computed(() => {
+  const position = Number(queueStatus.value?.position)
+  const waitingUsers = Number(queueStatus.value?.waitingUsers)
+  if (!Number.isFinite(position) || !Number.isFinite(waitingUsers) || waitingUsers <= 1) {
+    return 8
+  }
+  return Math.max(8, Math.min(95, 100 - ((position - 1) / waitingUsers) * 100))
 })
 
 const eventInformation = computed(() => {
@@ -548,6 +572,48 @@ function syncSelectedLocksFromServer() {
     .map((seat) => seat.id)
 }
 
+async function ensureQueueAccess(eventId) {
+  queueError.value = ''
+  const status = await joinVirtualQueue(eventId)
+  queueStatus.value = status
+
+  if (status.status === 'READY') {
+    clearQueuePolling()
+    return true
+  }
+
+  startQueuePolling(eventId)
+  return false
+}
+
+function startQueuePolling(eventId) {
+  clearQueuePolling()
+  queuePollHandle = setInterval(async () => {
+    try {
+      let status = await getVirtualQueueStatus(eventId)
+      if (status.status === 'NOT_JOINED') {
+        status = await joinVirtualQueue(eventId)
+      }
+
+      queueStatus.value = status
+      queueError.value = ''
+
+      if (status.status === 'READY') {
+        clearQueuePolling()
+        await loadBookingData()
+      }
+    } catch (err) {
+      queueError.value =
+        err?.response?.data?.message || 'Không thể cập nhật vị trí hàng chờ. Vui lòng thử lại.'
+    }
+  }, QUEUE_POLL_INTERVAL_MS)
+}
+
+function clearQueuePolling() {
+  clearInterval(queuePollHandle)
+  queuePollHandle = null
+}
+
 async function refreshSeatMap({ surfaceError = false, notifyChanges = false } = {}) {
   const eventId = route.query.eventId
   if (!eventId) return
@@ -584,11 +650,14 @@ function startSeatPolling() {
 
 async function loadBookingData() {
   clearInterval(pollHandle)
+  clearQueuePolling()
   loading.value = true
   error.value = ''
   needsEventSelection.value = false
   seatActionError.value = ''
   bookingToasts.value = []
+  queueStatus.value = null
+  queueError.value = ''
   selectedSeatIds.value = []
   selectedSeatsioObjects.value = []
   seatsioRenderError.value = ''
@@ -606,6 +675,12 @@ async function loadBookingData() {
     if (!eventId) {
       bookingEvent.value = null
       needsEventSelection.value = true
+      return
+    }
+
+    const hasQueueAccess = await ensureQueueAccess(eventId)
+    if (!hasQueueAccess) {
+      bookingEvent.value = null
       return
     }
 
@@ -652,6 +727,7 @@ watch(
 onUnmounted(() => {
   clearInterval(timerHandle)
   clearInterval(pollHandle)
+  clearQueuePolling()
   destroySeatsioChart()
 })
 
@@ -789,6 +865,54 @@ function seatsioCdnUrl() {
           @click="router.push('/events')"
         >
           Go to Events
+        </button>
+      </div>
+
+      <div
+        v-else-if="isWaitingRoom"
+        class="mx-auto max-w-3xl rounded-3xl border border-blue-100 bg-white p-8 text-center shadow-sm dark:border-blue-900 dark:bg-slate-800"
+      >
+        <p class="text-xs font-black uppercase tracking-[0.22em] text-brand-orange">
+          Virtual Queue
+        </p>
+        <h2 class="mt-3 text-3xl font-black text-brand-navy dark:text-white">
+          Phòng chờ đặt vé
+        </h2>
+        <p class="mx-auto mt-4 max-w-xl text-base font-semibold leading-7 text-slate-600 dark:text-slate-300">
+          Bạn đang ở vị trí thứ
+          <span class="font-black text-brand-orange">{{ queuePositionLabel }}</span>
+          trong hàng đợi. Vui lòng không tải lại trang.
+        </p>
+
+        <div class="mx-auto mt-8 max-w-md rounded-2xl bg-slate-50 p-5 dark:bg-slate-900">
+          <div class="flex items-center justify-between text-sm font-black text-slate-600 dark:text-slate-300">
+            <span>Còn trước bạn</span>
+            <span>{{ queueAheadCount.toLocaleString('vi-VN') }} người</span>
+          </div>
+          <div class="mt-4 h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+            <div
+              class="h-full rounded-full bg-brand-orange transition-all duration-500"
+              :style="{ width: `${queueProgressPercent}%` }"
+            ></div>
+          </div>
+          <p class="mt-4 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
+            Hệ thống sẽ tự chuyển bạn vào màn chọn ghế khi tới lượt
+          </p>
+        </div>
+
+        <p
+          v-if="queueError"
+          class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700"
+        >
+          {{ queueError }}
+        </p>
+
+        <button
+          type="button"
+          class="mt-6 rounded-2xl bg-brand-navy px-7 py-3 text-sm font-black uppercase tracking-[0.14em] text-white transition hover:bg-sky-800"
+          @click="loadBookingData"
+        >
+          Kiểm tra ngay
         </button>
       </div>
 

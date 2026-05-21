@@ -32,6 +32,21 @@ export async function getBookingEvent(eventId) {
   return data;
 }
 
+export async function joinVirtualQueue(eventId) {
+  const { data } = await apiClient.post(`/api/me/virtual-queue/events/${eventId}/join`);
+  return data;
+}
+
+export async function getVirtualQueueStatus(eventId) {
+  const { data } = await apiClient.get(`/api/me/virtual-queue/events/${eventId}/status`);
+  return data;
+}
+
+export async function leaveVirtualQueue(eventId) {
+  const { data } = await apiClient.delete(`/api/me/virtual-queue/events/${eventId}`);
+  return data;
+}
+
 export async function lockBookingSeats(payload) {
   const { data } = await apiClient.post("/api/me/checkout/seats/lock", payload);
   return data;
