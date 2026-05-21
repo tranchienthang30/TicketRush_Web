@@ -198,11 +198,11 @@ public class EventQueryRepository {
                         ELSE NULL
                     END AS lock_owner_user_id,
                     (
-                        :viewerUserId IS NOT NULL
+                        CAST(:viewerUserId AS uuid) IS NOT NULL
                         AND es.status = 'LOCKED'
                         AND es.lock_expires_at IS NOT NULL
                         AND es.lock_expires_at > now()
-                        AND es.locked_by = :viewerUserId
+                        AND es.locked_by = CAST(:viewerUserId AS uuid)
                     ) AS locked_by_current_user
                 FROM event_seats es
                 JOIN event_sections sec ON sec.id = es.section_id

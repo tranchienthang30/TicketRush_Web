@@ -38,6 +38,35 @@ cd frontend
 
 - Any DB change must add a new migration
 
+## User Cache (Redis) - Home/Event only
+- Mục tiêu: cache cho luồng user/khách (`CUSTOMER` hoặc anonymous), không cache cho `ADMIN`/`PROVIDER`.
+- Cache framework: Spring Cache + Redis.
+- Bật cache tại backend:
+  - `ticket/src/main/java/com/example/ticket/TicketApplication.java` (`@EnableCaching`)
+  - `ticket/src/main/resources/application.yml` (`spring.cache.type=redis`)
+  - `ticket/src/main/java/com/example/ticket/config/CacheConfig.java` (TTL + serializer)
+  - `ticket/src/main/java/com/example/ticket/config/UserCachePolicy.java` (điều kiện role được cache)
+
+### Endpoint user đang được cache
+- `GET /api/home` -> `user:home` (TTL 90s)
+- `GET /api/events/grouped?limitPerCategory=...` -> `user:events:grouped` (TTL 90s)
+- `GET /api/events?categoryId=&q=&city=&page=&size=` -> `user:events:search` (TTL 45s)
+- `GET /api/events/slug/{slug}` -> `user:events:slug` (TTL 120s)
+- `GET /api/events/legacy` -> `user:events:legacy` (TTL 60s)
+
+### Invalidation logic
+- Khi `create event` hoặc `update event` (provider/admin): xóa toàn bộ cache user Home/Event.
+- Khi admin `delete user` (có thể kéo theo xóa event provider): xóa toàn bộ cache user Home/Event.
+- Các thay đổi này được gắn qua `@CacheEvict(allEntries = true)` trong:
+  - `ticket/src/main/java/com/example/ticket/service/EventServiceImpl.java`
+  - `ticket/src/main/java/com/example/ticket/service/AdminServiceImpl.java`
+
+### Lưu ý kỹ thuật
+- `@Cacheable(sync = true)` được bật cho key nóng để tránh nhiều request cùng lúc cùng đánh DB.
+- Cache condition:
+  - `CUSTOMER`/anonymous: dùng cache.
+  - `ADMIN`/`PROVIDER`: bỏ qua cache, đọc trực tiếp DB.
+
 ## Auto run docker container and run springboot web
 - Open docker desktop
 - Use git bash

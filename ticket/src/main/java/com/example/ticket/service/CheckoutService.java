@@ -316,7 +316,7 @@ public class CheckoutService {
                     .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "Voucher code is invalid"));
 
             validateVoucher(voucher, userId, membershipApplied);
-            BigDecimal afterMembership = dbSubtotal.subtract(membershipDiscount);
+            BigDecimal afterMembership = ticketSubtotal.subtract(membershipDiscount).max(BigDecimal.ZERO);
 
             BigDecimal minOrder = defaultMoney(voucher.minOrderAmount());
             if (afterMembership.compareTo(minOrder) < 0) {
