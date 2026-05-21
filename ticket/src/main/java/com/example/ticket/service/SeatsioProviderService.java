@@ -130,7 +130,7 @@ public class SeatsioProviderService {
             throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "Seats.io admin key is not configured");
         }
 
-        String workspaceName = "TicketRush - " + providerName(provider);
+        String workspaceName = "TicketRush - " + providerName(provider) + " - " + shortId();
         JsonNode response = post("/workspaces", properties.getAdminKey(), Map.of("name", workspaceName));
 
         ProviderSeatWorkspace workspace = new ProviderSeatWorkspace();
@@ -191,6 +191,10 @@ public class SeatsioProviderService {
             return fullName.trim();
         }
         return provider.getEmail();
+    }
+
+    private String shortId() {
+        return UUID.randomUUID().toString().substring(0, 8);
     }
 
     private String normalizeVenueType(String value) {

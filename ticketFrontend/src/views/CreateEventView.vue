@@ -71,6 +71,7 @@ const isProviderReady = computed(() =>
   ["PROVIDER", "ADMIN"].includes(authStore.user?.role)
 );
 const isEditMode = computed(() => Boolean(route.params.id));
+const isAdvancedSeatSetup = computed(() => currentStep.value === 2 && form.seatProvider === "SEATS_IO");
 
 const providerRequestStatus = computed(() => authStore.user?.providerRequestStatus || null);
 const seatTypeOptions = [
@@ -668,27 +669,90 @@ function loadSeatsioScript(cdnUrl) {
         </form>
       </div>
 
-      <div v-else class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
-        <aside class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 h-fit sticky top-32">
-          <h2 class="font-black text-brand-navy dark:text-white mb-5">{{ isEditMode ? "Edit event" : "Create event" }}</h2>
-          <ol class="space-y-3">
+      <div
+        v-else
+        :class="[
+          'grid grid-cols-1 transition-all duration-200',
+          isAdvancedSeatSetup ? 'gap-4 xl:grid-cols-[88px_minmax(0,1fr)]' : 'gap-8 lg:grid-cols-[280px_1fr]',
+        ]"
+      >
+        <aside
+          :class="[
+            'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 h-fit sticky top-24 transition-all duration-200',
+            isAdvancedSeatSetup ? 'rounded-xl p-3' : 'rounded-2xl p-5',
+          ]"
+        >
+          <h2
+            :class="[
+              'font-black text-brand-navy dark:text-white',
+              isAdvancedSeatSetup ? 'mb-3 text-center text-xs uppercase tracking-[0.18em]' : 'mb-5',
+            ]"
+          >
+            {{ isAdvancedSeatSetup ? "Steps" : isEditMode ? "Edit event" : "Create event" }}
+          </h2>
+          <ol :class="isAdvancedSeatSetup ? 'flex justify-center gap-2 xl:flex-col xl:items-center' : 'space-y-3'">
             <li v-for="step in [
               { id: 1, label: 'Event information' },
               { id: 2, label: 'Seat setup' },
               { id: 3, label: 'Payment & confirmation' }
-            ]" :key="step.id" class="flex items-center gap-3">
-              <span :class="currentStep === step.id ? 'bg-brand-orange text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'" class="grid h-8 w-8 place-items-center rounded-full text-sm font-black">
+            ]" :key="step.id" :title="step.label" :class="isAdvancedSeatSetup ? 'flex justify-center' : 'flex items-center gap-3'">
+              <span
+                :class="[
+                  currentStep === step.id ? 'bg-brand-orange text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300',
+                  isAdvancedSeatSetup ? 'h-9 w-9' : 'h-8 w-8',
+                ]"
+                class="grid place-items-center rounded-full text-sm font-black"
+              >
                 {{ step.id }}
               </span>
-              <span :class="currentStep === step.id ? 'text-brand-orange' : 'text-slate-600 dark:text-slate-300'" class="font-bold">{{ step.label }}</span>
+              <span
+                v-if="!isAdvancedSeatSetup"
+                :class="currentStep === step.id ? 'text-brand-orange' : 'text-slate-600 dark:text-slate-300'"
+                class="font-bold"
+              >
+                {{ step.label }}
+              </span>
             </li>
           </ol>
         </aside>
 
-        <main class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm p-6 md:p-8">
-          <div class="mb-6 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-5">
-            <h1 class="text-2xl font-black text-brand-navy dark:text-white mb-2">{{ isEditMode ? "Update event" : "Provider rules" }}</h1>
-            <ul class="text-sm text-slate-600 dark:text-slate-300 space-y-1 list-disc pl-5">
+        <main
+          :class="[
+            'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm transition-all duration-200',
+            isAdvancedSeatSetup ? 'p-3 md:p-4' : 'p-6 md:p-8',
+          ]"
+        >
+          <div
+            :class="[
+              'rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-all duration-200',
+              isAdvancedSeatSetup ? 'mb-4 p-3 md:flex md:items-center md:justify-between md:gap-4' : 'mb-6 p-5',
+            ]"
+          >
+            <div>
+              <h1
+                :class="[
+                  'font-black text-brand-navy dark:text-white',
+                  isAdvancedSeatSetup ? 'text-base' : 'mb-2 text-2xl',
+                ]"
+              >
+                {{ isAdvancedSeatSetup ? "Advanced seat setup" : isEditMode ? "Update event" : "Provider rules" }}
+              </h1>
+              <p v-if="isAdvancedSeatSetup" class="mt-1 text-xs font-bold text-slate-500 dark:text-slate-300">
+                Configure workspace, chart, seats.io event, then map categories to TicketRush prices.
+              </p>
+            </div>
+            <div v-if="isAdvancedSeatSetup" class="mt-3 flex flex-wrap gap-2 md:mt-0">
+              <span class="rounded-lg bg-white px-3 py-1.5 text-xs font-black text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700">
+                Workspace {{ form.externalSeatWorkspaceKey ? "ready" : "missing" }}
+              </span>
+              <span class="rounded-lg bg-white px-3 py-1.5 text-xs font-black text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700">
+                Chart {{ form.externalSeatChartKey ? "ready" : "missing" }}
+              </span>
+              <span class="rounded-lg bg-white px-3 py-1.5 text-xs font-black text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700">
+                Event {{ form.externalSeatEventKey ? "ready" : "missing" }}
+              </span>
+            </div>
+            <ul v-else class="text-sm text-slate-600 dark:text-slate-300 space-y-1 list-disc pl-5">
               <li>Use accurate event information, official images, venue, and sale period.</li>
               <li>Ticket sections and seat labels must match the actual venue setup.</li>
               <li>Payout information must belong to the approved provider account.</li>
@@ -868,7 +932,7 @@ function loadSeatsioScript(cdnUrl) {
                 </button>
               </div>
 
-              <div class="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+              <div class="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
                 <div class="mb-3 flex items-center justify-between gap-3">
                   <p class="font-black text-slate-900 dark:text-white">Chart designer</p>
                   <button type="button" class="text-sm font-black text-brand-orange hover:underline" @click="renderSeatsioDesigner">
@@ -876,7 +940,7 @@ function loadSeatsioScript(cdnUrl) {
                   </button>
                 </div>
                 <div class="overflow-x-auto">
-                  <div id="seatsio-designer" class="h-[760px] min-h-[760px] min-w-[1080px] overflow-visible rounded-xl bg-slate-100 dark:bg-slate-900"></div>
+                  <div id="seatsio-designer" class="h-[calc(100vh-260px)] min-h-[680px] min-w-[1180px] overflow-visible rounded-xl bg-slate-100 dark:bg-slate-900"></div>
                 </div>
               </div>
 

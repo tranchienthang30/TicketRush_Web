@@ -57,7 +57,14 @@ const canBook = computed(() => {
   }
 
   const tag = String(props.event.tag || "").trim().toUpperCase();
-  return !["COMING SOON", "SOLD OUT"].includes(tag);
+  return !["COMING SOON", "BOOKING CLOSED", "SOLD OUT"].includes(tag);
+});
+
+const unavailableLabel = computed(() => {
+  const tag = String(props.event.tag || "").trim().toUpperCase();
+  if (tag === "BOOKING CLOSED") return "BOOKING CLOSED";
+  if (tag === "SOLD OUT") return "SOLD OUT";
+  return "COMING SOON";
 });
 
 const detailPath = computed(() => (props.event.slug ? `/events/${props.event.slug}` : "/events"));
@@ -129,7 +136,7 @@ function openDetailFromKeyboard(event) {
           v-else
           class="bg-slate-200 text-slate-500 px-4 py-2 rounded-lg font-bold cursor-not-allowed dark:bg-slate-700 dark:text-slate-300"
         >
-          COMING SOON
+          {{ unavailableLabel }}
         </span>
       </div>
     </div>

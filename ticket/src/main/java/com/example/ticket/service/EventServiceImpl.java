@@ -629,6 +629,9 @@ public class EventServiceImpl implements EventService {
         if (row.saleStartTime() != null && row.saleStartTime().isAfter(now)) {
             return "Coming Soon";
         }
+        if (row.saleEndTime() != null && row.saleEndTime().isBefore(now)) {
+            return "Booking Closed";
+        }
         if (knownSeats > 0 && row.availableSeats() == 0) {
             return "Sold Out";
         }
