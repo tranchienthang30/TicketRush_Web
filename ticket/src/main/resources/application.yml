@@ -89,6 +89,12 @@ app:
     expire-interval-ms: 15000
     expire-initial-delay-ms: 15000
 
+  virtual-queue:
+    enabled: "${VIRTUAL_QUEUE_ENABLED:true}"
+    max-active-users: "${VIRTUAL_QUEUE_MAX_ACTIVE_USERS:50}"
+    release-batch-size: "${VIRTUAL_QUEUE_RELEASE_BATCH_SIZE:50}"
+    access-ttl-seconds: "${VIRTUAL_QUEUE_ACCESS_TTL_SECONDS:900}"
+
   upload:
     dir: "${UPLOAD_DIR:uploads}"
 
