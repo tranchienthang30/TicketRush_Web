@@ -20,13 +20,18 @@ const categoryName = computed(() => {
 
 const heroImage = computed(() => eventDetail.value?.bannerUrl || fallbackImage);
 
-const listingLabel = computed(() => {
-  const listingType = String(eventDetail.value?.listingType || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+const listingTypeValue = computed(() =>
+  String(eventDetail.value?.listingType || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_"),
+);
 
-  if (listingType === "UPCOMING") {
+const listingLabel = computed(() => {
+  if (listingTypeValue.value === "UPCOMING") {
     return "Upcoming";
   }
-  if (listingType === "SPECIAL") {
+  if (listingTypeValue.value === "SPECIAL") {
     return "Special";
   }
   return "Now Showing";

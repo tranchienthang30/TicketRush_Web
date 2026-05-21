@@ -49,7 +49,25 @@ public class ProfileService {
     @Transactional
     public ProfileResponse updateProfile(UUID userId, UpdateProfileRequest request) {
         getProfile(userId);
-        profileRepository.updateProfile(userId, request);
+
+        String email = normalizeEmail(request.email());
+        String phone = blankToNull(request.phone());
+
+        if (profileRepository.existsByEmailForOtherUser(userId, email)) {
+            throw new ApiException(HttpStatus.CONFLICT, "Email is already in use");
+        }
+        if (phone != null && profileRepository.existsByPhoneForOtherUser(userId, phone)) {
+            throw new ApiException(HttpStatus.CONFLICT, "Phone number is already in use");
+        }
+
+        profileRepository.updateProfile(userId, new UpdateProfileRequest(
+                email,
+                request.fullName().trim(),
+                blankToNull(request.avatarUrl()),
+                phone,
+                blankToNull(request.gender()),
+                request.dateOfBirth()
+        ));
         return getProfile(userId);
     }
 
@@ -195,6 +213,17 @@ public class ProfileService {
 
     private int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String blankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private String buildQrContent(

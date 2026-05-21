@@ -39,10 +39,47 @@ public class ProfileQueryRepository {
         return rows.stream().findFirst();
     }
 
+    public boolean existsByEmailForOtherUser(UUID userId, String email) {
+        String sql = """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM users
+                    WHERE lower(email) = lower(:email)
+                    AND id <> :userId
+                )
+                """;
+
+        Boolean exists = jdbcTemplate.queryForObject(sql, new MapSqlParameterSource()
+                .addValue("userId", userId)
+                .addValue("email", email), Boolean.class);
+        return Boolean.TRUE.equals(exists);
+    }
+
+    public boolean existsByPhoneForOtherUser(UUID userId, String phone) {
+        String sql = """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM users
+                    WHERE phone = :phone
+                    AND id <> :userId
+                )
+                """;
+
+        Boolean exists = jdbcTemplate.queryForObject(sql, new MapSqlParameterSource()
+                .addValue("userId", userId)
+                .addValue("phone", phone), Boolean.class);
+        return Boolean.TRUE.equals(exists);
+    }
+
     public void updateProfile(UUID userId, UpdateProfileRequest request) {
         String sql = """
                 UPDATE users
-                SET full_name = COALESCE(NULLIF(:fullName, ''), full_name),
+                SET email_verified = CASE
+                        WHEN lower(email) = lower(:email) THEN email_verified
+                        ELSE false
+                    END,
+                    email = :email,
+                    full_name = :fullName,
                     avatar_url = :avatarUrl,
                     phone = :phone,
                     gender = :gender,
@@ -52,6 +89,7 @@ public class ProfileQueryRepository {
 
         jdbcTemplate.update(sql, new MapSqlParameterSource()
                 .addValue("userId", userId)
+                .addValue("email", request.email())
                 .addValue("fullName", request.fullName())
                 .addValue("avatarUrl", request.avatarUrl())
                 .addValue("phone", request.phone())

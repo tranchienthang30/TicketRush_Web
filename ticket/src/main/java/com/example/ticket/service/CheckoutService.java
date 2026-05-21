@@ -74,8 +74,8 @@ public class CheckoutService {
         OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
         OffsetDateTime lockExpiresAt = now.plusMinutes(bookingLockMinutes);
 
-        CheckoutQueryRepository.EventCheckoutRow event = checkoutRepository.findPublishedEvent(request.eventId())
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
+        CheckoutQueryRepository.EventCheckoutRow event = checkoutRepository.findBookableEvent(request.eventId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event is not available for booking"));
 
         List<CheckoutQueryRepository.SeatCheckoutRow> seats = checkoutRepository.findSeatsByIdsForUpdate(seatIds);
         validateSeatOwnershipAndAvailability(userId, event.id(), seats, seatIds, now, SeatValidationMode.LOCK);
@@ -286,8 +286,8 @@ public class CheckoutService {
         List<UUID> seatIds = normalizeSeatIds(rawSeatIds);
         OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
 
-        CheckoutQueryRepository.EventCheckoutRow event = checkoutRepository.findPublishedEvent(eventId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
+        CheckoutQueryRepository.EventCheckoutRow event = checkoutRepository.findBookableEvent(eventId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event is not available for booking"));
 
         List<CheckoutQueryRepository.SeatCheckoutRow> seats = forUpdate
                 ? checkoutRepository.findSeatsByIdsForUpdate(seatIds)

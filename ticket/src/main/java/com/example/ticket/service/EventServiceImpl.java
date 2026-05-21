@@ -369,7 +369,7 @@ public class EventServiceImpl implements EventService {
     @Transactional(readOnly = true)
     public BookingEventResponse getBookingEvent(UUID eventId, UUID viewerUserId) {
         EventQueryRepository.BookingEventRow event = eventQueryRepository.findPublishedEventForBooking(eventId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event not found"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Event is not available for booking"));
 
         List<EventQueryRepository.BookingSectionRow> sections = eventQueryRepository.findSectionsByEvent(eventId);
         Map<UUID, List<BookingSeatResponse>> seatsBySection = eventQueryRepository.findSeatsByEvent(eventId, viewerUserId).stream()
