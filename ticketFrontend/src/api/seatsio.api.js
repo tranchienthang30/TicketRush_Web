@@ -12,6 +12,10 @@ export function createChart(payload) {
   return apiClient.post("/api/provider/seatsio/charts", payload);
 }
 
+export function getChartCategories(chartKey) {
+  return apiClient.get(`/api/provider/seatsio/charts/${encodeURIComponent(chartKey)}/categories`);
+}
+
 export function createSeatsioEvent(payload) {
   return apiClient.post("/api/provider/seatsio/events", payload);
 }

@@ -3,6 +3,7 @@ package com.example.ticket.service;
 import com.example.ticket.config.SeatsioProperties;
 import com.example.ticket.dto.request.SeatsioChartCreateRequest;
 import com.example.ticket.dto.request.SeatsioEventCreateRequest;
+import com.example.ticket.dto.response.SeatsioCategoryResponse;
 import com.example.ticket.dto.response.SeatsioChartResponse;
 import com.example.ticket.dto.response.SeatsioEventResponse;
 import com.example.ticket.dto.response.SeatsioWorkspaceResponse;
@@ -14,10 +15,13 @@ import com.example.ticket.repository.ProviderSeatWorkspaceRepository;
 import com.example.ticket.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -86,7 +90,10 @@ public class SeatsioProviderService {
         body.put("venueType", venueType);
         body.put("categories", defaultCategories());
 
-        JsonNode response = post("/charts", workspace.getWorkspaceSecretKey(), body);
+        JsonNode response = withWorkspaceActivationRetry(
+                workspace,
+                () -> post("/charts", workspace.getWorkspaceSecretKey(), body)
+        );
         return new SeatsioChartResponse(
                 text(response, "key"),
                 text(response, "name"),
@@ -99,11 +106,13 @@ public class SeatsioProviderService {
         ProviderSeatWorkspace workspace = workspaceRepository.findById(providerId)
                 .orElseGet(() -> createWorkspace(requireProvider(providerId)));
 
+        String eventKey = request.eventKey() == null || request.eventKey().isBlank()
+                ? "tr-" + UUID.randomUUID()
+                : request.eventKey().trim();
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("chartKey", request.chartKey().trim());
-        body.put("eventKey", request.eventKey() == null || request.eventKey().isBlank()
-                ? "tr-" + UUID.randomUUID()
-                : request.eventKey().trim());
+        body.put("eventKey", eventKey);
         if (request.name() != null && !request.name().isBlank()) {
             body.put("name", request.name().trim());
         }
@@ -111,13 +120,47 @@ public class SeatsioProviderService {
             body.put("date", request.date().format(DateTimeFormatter.ISO_LOCAL_DATE));
         }
 
-        JsonNode response = post("/events", workspace.getWorkspaceSecretKey(), body);
+        JsonNode response = withWorkspaceActivationRetry(
+                workspace,
+                () -> post("/events", workspace.getWorkspaceSecretKey(), body)
+        );
         return new SeatsioEventResponse(
-                text(response, "eventKey"),
+                text(response, "eventKey", text(response, "key", eventKey)),
                 request.chartKey().trim(),
                 text(response, "name"),
                 text(response, "date")
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<SeatsioCategoryResponse> listChartCategories(UUID providerId, String chartKey) {
+        if (chartKey == null || chartKey.isBlank()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "Seats.io chart key is required");
+        }
+        ProviderSeatWorkspace workspace = workspaceRepository.findById(providerId)
+                .orElseThrow(() -> new AppException(HttpStatus.BAD_REQUEST, "Seats.io workspace is not ready"));
+
+        JsonNode response = withWorkspaceActivationRetry(
+                workspace,
+                () -> get("/charts/{chartKey}/categories", workspace.getWorkspaceSecretKey(), chartKey.trim())
+        );
+        JsonNode categoriesNode = response == null ? null : (response.isArray() ? response : response.path("categories"));
+        List<SeatsioCategoryResponse> categories = new ArrayList<>();
+        if (categoriesNode != null && categoriesNode.isArray()) {
+            for (JsonNode category : categoriesNode) {
+                String key = text(category, "key");
+                if (key == null) {
+                    continue;
+                }
+                categories.add(new SeatsioCategoryResponse(
+                        key,
+                        text(category, "label", key),
+                        text(category, "color"),
+                        category.path("accessible").asBoolean(false)
+                ));
+            }
+        }
+        return categories;
     }
 
     @Transactional(readOnly = true)
@@ -160,6 +203,51 @@ public class SeatsioProviderService {
         } catch (RestClientException exception) {
             throw new AppException(HttpStatus.BAD_GATEWAY, "Seats.io request failed: " + exception.getMessage());
         }
+    }
+
+    private JsonNode get(String path, String secretOrAdminKey, Object... uriVariables) {
+        try {
+            return restClient.get()
+                    .uri(path, uriVariables)
+                    .headers(headers -> headers.setBasicAuth(secretOrAdminKey, ""))
+                    .retrieve()
+                    .body(JsonNode.class);
+        } catch (RestClientException exception) {
+            throw new AppException(HttpStatus.BAD_GATEWAY, "Seats.io request failed: " + exception.getMessage());
+        }
+    }
+
+    private JsonNode withWorkspaceActivationRetry(ProviderSeatWorkspace workspace, Supplier<JsonNode> request) {
+        try {
+            return request.get();
+        } catch (AppException exception) {
+            if (!isUserInactive(exception)) {
+                throw exception;
+            }
+            activateWorkspace(workspace);
+            return request.get();
+        }
+    }
+
+    private void activateWorkspace(ProviderSeatWorkspace workspace) {
+        if (!properties.isConfigured()) {
+            throw new AppException(HttpStatus.SERVICE_UNAVAILABLE, "Seats.io admin key is not configured");
+        }
+        try {
+            restClient.post()
+                    .uri("/workspaces/{workspaceKey}/actions/activate", workspace.getWorkspaceKey())
+                    .headers(headers -> headers.setBasicAuth(properties.getAdminKey(), ""))
+                    .retrieve()
+                    .toBodilessEntity();
+            workspace.setActive(true);
+            workspaceRepository.save(workspace);
+        } catch (RestClientException exception) {
+            throw new AppException(HttpStatus.BAD_GATEWAY, "Seats.io workspace activation failed: " + exception.getMessage());
+        }
+    }
+
+    private boolean isUserInactive(AppException exception) {
+        return exception.getMessage() != null && exception.getMessage().contains("USER_INACTIVE");
     }
 
     private SeatsioWorkspaceResponse toWorkspaceResponse(ProviderSeatWorkspace workspace) {

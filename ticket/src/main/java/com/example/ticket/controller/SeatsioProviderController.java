@@ -2,13 +2,16 @@ package com.example.ticket.controller;
 
 import com.example.ticket.dto.request.SeatsioChartCreateRequest;
 import com.example.ticket.dto.request.SeatsioEventCreateRequest;
+import com.example.ticket.dto.response.SeatsioCategoryResponse;
 import com.example.ticket.dto.response.SeatsioChartResponse;
 import com.example.ticket.dto.response.SeatsioEventResponse;
 import com.example.ticket.dto.response.SeatsioWorkspaceResponse;
 import com.example.ticket.service.CurrentUserService;
 import com.example.ticket.service.SeatsioProviderService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -41,6 +44,11 @@ public class SeatsioProviderController {
     @PostMapping("/charts")
     public SeatsioChartResponse createChart(@Valid @RequestBody SeatsioChartCreateRequest request) {
         return seatsioProviderService.createChart(currentUserService.resolve(null), request);
+    }
+
+    @GetMapping("/charts/{chartKey}/categories")
+    public List<SeatsioCategoryResponse> listChartCategories(@PathVariable String chartKey) {
+        return seatsioProviderService.listChartCategories(currentUserService.resolve(null), chartKey);
     }
 
     @PostMapping("/events")

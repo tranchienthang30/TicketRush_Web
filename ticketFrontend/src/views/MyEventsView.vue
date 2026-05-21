@@ -158,7 +158,7 @@ function loadSeatsioScript(cdnUrl) {
 
   seatsioScriptPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = cdnUrl || "https://cdn-eu.seatsio.net/chart.js";
+    script.src = cdnUrl || "https://cdn-oc.seatsio.net/chart.js";
     script.async = true;
     script.onload = resolve;
     script.onerror = () => reject(new Error("Unable to load seats.io chart.js"));

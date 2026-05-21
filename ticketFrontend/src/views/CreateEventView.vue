@@ -159,6 +159,38 @@ function removeSection(index) {
   }
 }
 
+function applySeatsioCategories(categories) {
+  const existingPrices = new Map(
+    form.sections.map((section) => [
+      String(section.name || "").trim().toLowerCase(),
+      Number(section.basePrice || 0),
+    ]),
+  );
+  const sections = categories
+    .map((category) => {
+      const key = String(category.key || "").trim();
+      const label = String(category.label || key).trim();
+      if (!key) return null;
+      const price =
+        existingPrices.get(key.toLowerCase()) ??
+        existingPrices.get(label.toLowerCase()) ??
+        0;
+      return {
+        name: key,
+        label,
+        color: category.color || "",
+        basePrice: price,
+        rowCount: 1,
+        seatsPerRow: 1,
+      };
+    })
+    .filter(Boolean);
+
+  if (sections.length > 0) {
+    form.sections.splice(0, form.sections.length, ...sections);
+  }
+}
+
 function addSeatRow() {
   const label = nextRowLabel(form.internalSeatRows.length);
   form.internalSeatRows.push({
@@ -552,6 +584,7 @@ async function createSeatsioChart() {
     });
     form.externalSeatChartKey = response.data.key;
     seatsioMessage.value = "Chart created. Use the designer below to publish the seating layout.";
+    await syncSeatsioCategoriesFromChart({ silent: true });
     await nextTick();
     await renderSeatsioDesigner();
   } catch (err) {
@@ -570,17 +603,63 @@ async function createSeatsioEventFromChart() {
   seatsioError.value = "";
   seatsioMessage.value = "";
   try {
+    if (form.externalSeatEventKey) {
+      await syncSeatsioCategoriesFromChart({ silent: true });
+      seatsioMessage.value = "Seats.io event key is already attached. Categories were synced from the chart.";
+      return;
+    }
     const response = await seatsioApi.createSeatsioEvent({
       chartKey: form.externalSeatChartKey,
       name: form.title || "TicketRush event",
       date: form.startTime ? form.startTime.slice(0, 10) : null,
     });
-    form.externalSeatEventKey = response.data.eventKey;
-    seatsioMessage.value = "Seats.io event created from this chart.";
+    const eventKey = response.data?.eventKey || response.data?.key;
+    if (!eventKey) {
+      throw new Error("Seats.io event was created but no event key was returned.");
+    }
+    form.externalSeatEventKey = eventKey;
+    await syncSeatsioCategoriesFromChart({ silent: true });
+    seatsioMessage.value = "Seats.io chart saved and event key attached.";
   } catch (err) {
-    seatsioError.value = err.response?.data?.message || "Unable to create seats.io event.";
+    seatsioError.value = err.response?.data?.message || err.message || "Unable to create seats.io event.";
   } finally {
     seatsioLoading.value = false;
+  }
+}
+
+async function syncSeatsioCategoriesFromChart({ silent = false } = {}) {
+  if (!form.externalSeatChartKey) {
+    if (!silent) {
+      seatsioError.value = "Create or enter a chart key first.";
+    }
+    return;
+  }
+  if (!silent) {
+    seatsioLoading.value = true;
+    seatsioError.value = "";
+    seatsioMessage.value = "";
+  }
+  try {
+    const response = await seatsioApi.getChartCategories(form.externalSeatChartKey);
+    const chartCategories = Array.isArray(response.data) ? response.data : [];
+    if (chartCategories.length === 0) {
+      if (!silent) {
+        seatsioError.value = "No seats.io categories were found for this chart.";
+      }
+      return;
+    }
+    applySeatsioCategories(chartCategories);
+    if (!silent) {
+      seatsioMessage.value = "Seats.io categories loaded. Add prices before continuing.";
+    }
+  } catch (err) {
+    if (!silent) {
+      seatsioError.value = err.response?.data?.message || "Unable to load seats.io categories.";
+    }
+  } finally {
+    if (!silent) {
+      seatsioLoading.value = false;
+    }
   }
 }
 
@@ -625,7 +704,7 @@ function loadSeatsioScript(cdnUrl) {
 
   seatsioScriptPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = cdnUrl || "https://cdn-eu.seatsio.net/chart.js";
+    script.src = cdnUrl || "https://cdn-oc.seatsio.net/chart.js";
     script.async = true;
     script.onload = resolve;
     script.onerror = () => reject(new Error("Unable to load seats.io chart.js"));
@@ -928,7 +1007,7 @@ function loadSeatsioScript(cdnUrl) {
                   Create chart
                 </button>
                 <button type="button" :disabled="seatsioLoading || !form.externalSeatChartKey" class="rounded-xl bg-brand-orange px-4 py-3 font-black text-white disabled:opacity-60" @click="createSeatsioEventFromChart">
-                  Create event
+                  Save chart
                 </button>
               </div>
 
@@ -945,7 +1024,22 @@ function loadSeatsioScript(cdnUrl) {
               </div>
 
               <div class="space-y-4">
-                <p class="font-black text-slate-900 dark:text-white">Ticket categories shown in TicketRush checkout</p>
+                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p class="font-black text-slate-900 dark:text-white">Ticket categories shown in TicketRush checkout</p>
+                    <p class="mt-1 text-sm font-bold text-slate-500 dark:text-slate-300">
+                      Category must match the seats.io category key. Load from chart, then set the TicketRush price for each category.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    :disabled="seatsioLoading || !form.externalSeatChartKey"
+                    class="rounded-xl border border-brand-orange px-4 py-2 text-sm font-black text-brand-orange disabled:opacity-60"
+                    @click="syncSeatsioCategoriesFromChart()"
+                  >
+                    Load from chart
+                  </button>
+                </div>
                 <div v-for="(section, index) in form.sections" :key="index" class="grid grid-cols-1 md:grid-cols-5 gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
                   <label class="block md:col-span-2">
                     <span class="block text-xs font-bold mb-1 text-slate-600 dark:text-slate-300">Category</span>

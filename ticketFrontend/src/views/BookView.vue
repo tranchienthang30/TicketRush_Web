@@ -124,6 +124,12 @@ const selectedSeats = computed(() => {
   return visibleSeats.value.filter((seat) => selectedIds.has(seat.id))
 })
 
+const selectedSeatsioLabels = computed(() =>
+  selectedSeatsioObjects.value.map((object) => object.label).filter(Boolean),
+)
+const selectedSeatsioTotal = computed(() =>
+  selectedSeatsioObjects.value.reduce((sum, object) => sum + Number(object.price || 0), 0),
+)
 const selectedSeatCodes = computed(() => {
   const selectedIds = new Set(selectedSeatIds.value)
   const codes = []
@@ -152,7 +158,9 @@ const seatLegendItems = computed(() => {
   return items
 })
 const totalPrice = computed(() =>
-  selectedSeats.value.reduce((sum, seat) => sum + Number(seat.price || 0), 0),
+  usesSeatsio.value
+    ? selectedSeatsioTotal.value
+    : selectedSeats.value.reduce((sum, seat) => sum + Number(seat.price || 0), 0),
 )
 const activeLockExpiryMs = computed(() => {
   const lockExpiryValues = selectedSeats.value
@@ -250,6 +258,19 @@ const seatsioPricing = computed(() => ({
     price: Number(section.basePrice || 0),
   })),
 }))
+const seatsioPriceByCategory = computed(() => {
+  const prices = new Map()
+  for (const section of bookingEvent.value?.sections || []) {
+    const price = Number(section.basePrice || 0)
+    for (const key of [section.name, section.seatTypeCode]) {
+      const normalized = String(key || '').trim().toLowerCase()
+      if (normalized) {
+        prices.set(normalized, price)
+      }
+    }
+  }
+  return prices
+})
 
 function rowToIndex(rowLabel) {
   return (
@@ -460,7 +481,7 @@ function seatUnitStyle(row, unitIndex, unit) {
 
 function continueToCheckout() {
   if (usesSeatsio.value) {
-    seatActionError.value = 'Seats.io checkout needs object-label checkout wiring before payment can continue.'
+    seatActionError.value = ''
     return
   }
   if (!bookingEvent.value || selectedSeatIds.value.length === 0) return
@@ -738,14 +759,17 @@ async function renderSeatsioChart() {
       session: 'continue',
       pricing: seatsioPricing.value,
       onObjectSelected: (object) => {
-        const label = object?.label || object?.id
-        if (label && !selectedSeatsioObjects.value.includes(label)) {
-          selectedSeatsioObjects.value = [...selectedSeatsioObjects.value, label]
+        const selection = seatsioSelectionFromObject(object)
+        if (
+          selection.label &&
+          !selectedSeatsioObjects.value.some((item) => item.label === selection.label)
+        ) {
+          selectedSeatsioObjects.value = [...selectedSeatsioObjects.value, selection]
         }
       },
       onObjectDeselected: (object) => {
-        const label = object?.label || object?.id
-        selectedSeatsioObjects.value = selectedSeatsioObjects.value.filter((item) => item !== label)
+        const label = String(object?.label || object?.id || '').trim()
+        selectedSeatsioObjects.value = selectedSeatsioObjects.value.filter((item) => item.label !== label)
       },
     }).render()
   } catch (err) {
@@ -776,8 +800,40 @@ function loadSeatsioScript() {
 }
 
 function seatsioCdnUrl() {
-  const region = import.meta.env.VITE_SEATSIO_REGION || 'eu'
+  const region = import.meta.env.VITE_SEATSIO_REGION || 'oc'
   return `https://cdn-${region}.seatsio.net/chart.js`
+}
+
+function seatsioSelectionFromObject(object) {
+  const label = String(object?.label || object?.id || '').trim()
+  const category = seatsioObjectCategory(object)
+  const normalizedCategory = category.toLowerCase()
+  const directPrice = Number(object?.pricing?.price ?? object?.price)
+  const mappedPrice = seatsioPriceByCategory.value.get(normalizedCategory)
+  const price = Number.isFinite(directPrice) && directPrice >= 0
+    ? directPrice
+    : Number(mappedPrice || 0)
+
+  return {
+    label,
+    category: category || 'Category',
+    price,
+  }
+}
+
+function seatsioObjectCategory(object) {
+  const category = object?.category
+  if (typeof category === 'string') {
+    return category.trim()
+  }
+  return String(
+    category?.key ||
+      category?.label ||
+      object?.categoryKey ||
+      object?.categoryLabel ||
+      object?.categoryName ||
+      '',
+  ).trim()
 }
 </script>
 
@@ -896,28 +952,27 @@ function seatsioCdnUrl() {
           <section class="space-y-6">
             <div
               v-if="usesSeatsio"
-              class="rounded-[2rem] border border-slate-200 bg-white px-4 pb-8 pt-6 shadow-sm dark:border-slate-700 dark:bg-slate-800 md:px-8"
+              class="rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 md:p-6"
             >
-              <div class="mx-auto mb-6 max-w-5xl">
-                <div
-                  class="h-4 rounded-full bg-gradient-to-b from-amber-300 via-amber-200 to-transparent"
-                ></div>
-                <p
-                  class="mt-3 text-center text-xs font-black uppercase tracking-[0.3em] text-slate-500 dark:text-slate-300"
-                >
-                  Stage / Venue
+              <div class="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p class="text-xs font-black uppercase tracking-[0.2em] text-brand-orange">Advanced seating</p>
+                  <h2 class="mt-1 text-xl font-black text-brand-navy dark:text-white">Choose seats on the seats.io map</h2>
+                </div>
+                <p class="text-xs font-bold text-slate-500 dark:text-slate-300">
+                  {{ selectedSeatsioObjects.length }} selected
                 </p>
               </div>
 
               <div
                 v-if="seatsioRenderError"
-                class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700"
+                class="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700"
               >
                 {{ seatsioRenderError }}
               </div>
               <div
                 id="seatsio-booking-chart"
-                class="min-h-[620px] overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-900"
+                class="min-h-[680px] overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-900"
               ></div>
             </div>
 
@@ -1015,13 +1070,25 @@ function seatsioCdnUrl() {
                     {{
                       usesSeatsio
                         ? selectedSeatsioObjects.length > 0
-                          ? selectedSeatsioObjects.join(', ')
+                          ? selectedSeatsioLabels.join(', ')
                           : 'No seats selected'
                         : selectedSeatCodes.length > 0
                         ? selectedSeatCodes.join(', ')
                         : 'No seats selected'
                     }}
                   </p>
+                  <div
+                    v-if="usesSeatsio && selectedSeatsioObjects.length > 0"
+                    class="mt-3 flex flex-wrap gap-2"
+                  >
+                    <span
+                      v-for="object in selectedSeatsioObjects"
+                      :key="object.label"
+                      class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    >
+                      {{ object.label }} · {{ object.category }} · {{ formatMoney(object.price) }}
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">Total</p>
@@ -1030,19 +1097,24 @@ function seatsioCdnUrl() {
                   </p>
                 </div>
                 <button
+                  v-if="!usesSeatsio"
                   type="button"
-                  :disabled="usesSeatsio ? selectedSeatsioObjects.length === 0 : selectedSeatIds.length === 0 || seatActionLoading"
+                  :disabled="selectedSeatIds.length === 0 || seatActionLoading"
                   @click="continueToCheckout"
                   class="rounded-2xl bg-brand-navy px-8 py-4 text-sm font-black uppercase tracking-[0.2em] text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
                   Checkout
                 </button>
+                <div
+                  v-else
+                  class="rounded-2xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-black text-blue-700 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-200"
+                >
+                  Demo selection only
+                </div>
               </div>
-              <p
-                v-if="usesSeatsio && seatActionError"
-                class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700"
-              >
-                {{ seatActionError }}
+              <p v-if="usesSeatsio" class="mt-4 text-sm font-bold text-slate-500 dark:text-slate-300">
+                Advanced seats.io checkout is not connected yet. This demo shows selected objects and
+                prices from TicketRush category mapping.
               </p>
             </div>
           </section>

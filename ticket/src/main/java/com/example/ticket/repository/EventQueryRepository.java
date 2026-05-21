@@ -233,14 +233,21 @@ public class EventQueryRepository {
                     e.sale_start_time,
                     e.sale_end_time,
                     COALESCE((SELECT MIN(base_price) FROM event_sections WHERE event_id = e.id), 0) AS min_price,
-                    (SELECT COUNT(*) FROM event_seats
-                        WHERE event_id = e.id
-                        AND (
-                            status = 'AVAILABLE'
-                            OR (status = 'LOCKED' AND lock_expires_at IS NOT NULL AND lock_expires_at <= now())
+                    CASE
+                        WHEN e.seat_provider = 'SEATS_IO'
+                            THEN COALESCE((SELECT SUM(row_count * seats_per_row) FROM event_sections WHERE event_id = e.id), 0)
+                        ELSE (SELECT COUNT(*) FROM event_seats
+                            WHERE event_id = e.id
+                            AND (
+                                status = 'AVAILABLE'
+                                OR (status = 'LOCKED' AND lock_expires_at IS NOT NULL AND lock_expires_at <= now())
+                            )
                         )
-                    ) AS available_seats,
-                    (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'SOLD') AS sold_seats
+                    END AS available_seats,
+                    CASE
+                        WHEN e.seat_provider = 'SEATS_IO' THEN 0
+                        ELSE (SELECT COUNT(*) FROM event_seats WHERE event_id = e.id AND status = 'SOLD')
+                    END AS sold_seats
                 FROM events e
                     LEFT JOIN categories c ON c.id = e.category_id
                 WHERE e.status = 'PUBLISHED'
