@@ -19,21 +19,26 @@ jobs:
   deploy:
     name: Deploy to Compute Engine
     runs-on: ubuntu-latest
+    env:
+      VM_USER: ${{ secrets.GCP_VM_USER }}
+      VM_HOST: ${{ secrets.GCP_VM_HOST }}
+      DEPLOY_PATH: ${{ secrets.GCP_VM_DEPLOY_PATH }}
+      SSH_PRIVATE_KEY: ${{ secrets.GCP_VM_SSH_PRIVATE_KEY }}
+      DEPLOY_BRANCH: ${{ inputs.branch }}
 
     steps:
       - name: Prepare SSH
         run: |
+          test -n "$VM_USER" || { echo "Missing secret GCP_VM_USER"; exit 1; }
+          test -n "$VM_HOST" || { echo "Missing secret GCP_VM_HOST"; exit 1; }
+          test -n "$DEPLOY_PATH" || { echo "Missing secret GCP_VM_DEPLOY_PATH"; exit 1; }
+          test -n "$SSH_PRIVATE_KEY" || { echo "Missing secret GCP_VM_SSH_PRIVATE_KEY"; exit 1; }
           mkdir -p ~/.ssh
-          echo "${{ secrets.GCP_VM_SSH_PRIVATE_KEY }}" > ~/.ssh/ticketrush_deploy_key
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ticketrush_deploy_key
           chmod 600 ~/.ssh/ticketrush_deploy_key
-          ssh-keyscan -H "${{ secrets.GCP_VM_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -T 20 -H "$VM_HOST" >> ~/.ssh/known_hosts
 
       - name: Deploy with Docker Compose
-        env:
-          VM_USER: ${{ secrets.GCP_VM_USER }}
-          VM_HOST: ${{ secrets.GCP_VM_HOST }}
-          DEPLOY_PATH: ${{ secrets.GCP_VM_DEPLOY_PATH }}
-          DEPLOY_BRANCH: ${{ inputs.branch }}
         run: |
           ssh -i ~/.ssh/ticketrush_deploy_key "$VM_USER@$VM_HOST" "
             set -e
