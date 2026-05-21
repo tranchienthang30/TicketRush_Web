@@ -245,7 +245,7 @@ onMounted(loadHome);
               <router-link
                 v-for="(movie, index) in nowShowing"
                 :key="movie.id"
-                :to="movieTarget(movie)"
+                :to="movieDetailTarget(movie)"
                 class="movie-card"
               >
                 <div class="movie-poster">
@@ -309,7 +309,7 @@ onMounted(loadHome);
           <section v-if="promotionEvents.length">
             <div class="section-head">
               <div>
-                <h2 class="section-title">Khuyến mãi</h2>
+                <h2 class="section-title">Promotions</h2>
                 <div class="section-line"></div>
               </div>
               <router-link to="/events" class="section-link">
