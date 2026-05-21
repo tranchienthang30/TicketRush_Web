@@ -63,6 +63,13 @@ public class PaymentWebhookService {
         }
 
         if (!"00".equals(paymentCode)) {
+            OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
+            int cancelled = checkoutRepository.markOrderCancelledIfPending(orderId, now);
+            if (cancelled > 0) {
+                checkoutRepository.releaseSeatLocksForOrder(orderId);
+                log.info("payOS webhook marked order as cancelled and released seat locks. orderId={} code={}",
+                        orderId, paymentCode);
+            }
             log.warn("payOS webhook received non-success payment code. orderId={} code={} description={}",
                     orderId, paymentCode, description);
             return "Payment is not successful yet";

@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { completePayOSCheckout } from '@/api/ticketRushApi'
+import { cancelPayOSCheckout, completePayOSCheckout } from '@/api/ticketRushApi'
 
 const CHECKOUT_STORAGE_KEY = 'ticketrush_checkout_payload'
 const router = useRouter()
@@ -15,8 +15,16 @@ function isFailedReturn() {
 
 onMounted(async () => {
   sessionStorage.removeItem(CHECKOUT_STORAGE_KEY)
+  const orderCode = Number(route.query.orderCode)
 
   if (isFailedReturn()) {
+    if (Number.isFinite(orderCode) && orderCode > 0) {
+      try {
+        await cancelPayOSCheckout(orderCode)
+      } catch {
+        // Ignore: lock might already be released by scheduler/webhook.
+      }
+    }
     message.value = 'Payment was not completed. Redirecting to Home...'
     window.setTimeout(() => {
       router.replace({ name: 'home' })
@@ -24,7 +32,6 @@ onMounted(async () => {
     return
   }
 
-  const orderCode = Number(route.query.orderCode)
   if (Number.isFinite(orderCode) && orderCode > 0) {
     try {
       await completePayOSCheckout(orderCode)

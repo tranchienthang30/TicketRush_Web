@@ -236,6 +236,29 @@ public class CheckoutQueryRepository {
         return jdbcTemplate.update(sql, new MapSqlParameterSource("now", now));
     }
 
+    public List<ExpiredSeatLockOwnerRow> findExpiredSeatLockOwners(OffsetDateTime now) {
+        String sql = """
+                SELECT
+                    event_id,
+                    locked_by,
+                    COUNT(*) AS seat_count
+                FROM event_seats
+                WHERE status = 'LOCKED'
+                AND locked_by IS NOT NULL
+                AND lock_expires_at IS NOT NULL
+                AND lock_expires_at <= :now
+                GROUP BY event_id, locked_by
+                """;
+
+        return jdbcTemplate.query(sql,
+                new MapSqlParameterSource("now", now),
+                (rs, rowNum) -> new ExpiredSeatLockOwnerRow(
+                        rs.getObject("event_id", UUID.class),
+                        rs.getObject("locked_by", UUID.class),
+                        rs.getLong("seat_count")
+                ));
+    }
+
     public int markOrderSeatsSold(UUID orderId) {
         String sql = """
                 UPDATE event_seats es
@@ -339,6 +362,39 @@ public class CheckoutQueryRepository {
         return jdbcTemplate.update(sql, new MapSqlParameterSource()
                 .addValue("orderId", orderId)
                 .addValue("paidAt", paidAt));
+    }
+
+    public int markOrderCancelledIfPending(UUID orderId, OffsetDateTime cancelledAt) {
+        String sql = """
+                UPDATE orders
+                SET status = 'CANCELLED',
+                    cancelled_at = :cancelledAt
+                WHERE id = :orderId
+                AND status = 'PENDING'
+                """;
+
+        return jdbcTemplate.update(sql, new MapSqlParameterSource()
+                .addValue("orderId", orderId)
+                .addValue("cancelledAt", cancelledAt));
+    }
+
+    public int releaseSeatLocksForOrder(UUID orderId) {
+        String sql = """
+                UPDATE event_seats es
+                SET status = 'AVAILABLE',
+                    locked_by = NULL,
+                    lock_expires_at = NULL,
+                    version = es.version + 1,
+                    updated_at = now()
+                FROM order_items oi
+                JOIN orders o ON o.id = oi.order_id
+                WHERE oi.order_id = :orderId
+                AND oi.event_seat_id = es.id
+                AND es.status = 'LOCKED'
+                AND es.locked_by = o.user_id
+                """;
+
+        return jdbcTemplate.update(sql, new MapSqlParameterSource("orderId", orderId));
     }
 
     public int issueTicketsForOrder(UUID orderId, OffsetDateTime issuedAt) {
@@ -631,6 +687,13 @@ public class CheckoutQueryRepository {
     public record OrderTicketQrRow(
             String seatCode,
             String qrCode
+    ) {
+    }
+
+    public record ExpiredSeatLockOwnerRow(
+            UUID eventId,
+            UUID userId,
+            long seatCount
     ) {
     }
 }

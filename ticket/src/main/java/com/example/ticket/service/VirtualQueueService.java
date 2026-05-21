@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 public class VirtualQueueService {
     private static final ZoneId APP_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String KEY_PREFIX = "virtual-queue:event:";
+    private static final String PENALTY_COUNT_KEY_PREFIX = "virtual-queue:penalty:count:event:";
+    private static final String PENALTY_UNTIL_KEY_PREFIX = "virtual-queue:penalty:until:event:";
 
     private final StringRedisTemplate redisTemplate;
     private final EventQueryRepository eventQueryRepository;
@@ -26,6 +28,10 @@ public class VirtualQueueService {
     private final int releaseBatchSize;
     private final long accessTtlSeconds;
     private final Duration redisKeyTtl;
+    private final boolean reentryPenaltyEnabled;
+    private final long penaltyBaseSeconds;
+    private final long penaltyMaxSeconds;
+    private final long penaltyStrikeTtlSeconds;
 
     public VirtualQueueService(
             StringRedisTemplate redisTemplate,
@@ -33,7 +39,11 @@ public class VirtualQueueService {
             @Value("${app.virtual-queue.enabled:true}") boolean enabled,
             @Value("${app.virtual-queue.max-active-users:50}") int maxActiveUsers,
             @Value("${app.virtual-queue.release-batch-size:50}") int releaseBatchSize,
-            @Value("${app.virtual-queue.access-ttl-seconds:900}") long accessTtlSeconds
+            @Value("${app.virtual-queue.access-ttl-seconds:900}") long accessTtlSeconds,
+            @Value("${app.virtual-queue.reentry-penalty-enabled:true}") boolean reentryPenaltyEnabled,
+            @Value("${app.virtual-queue.reentry-penalty-base-seconds:120}") long penaltyBaseSeconds,
+            @Value("${app.virtual-queue.reentry-penalty-max-seconds:3600}") long penaltyMaxSeconds,
+            @Value("${app.virtual-queue.reentry-penalty-strike-ttl-seconds:86400}") long penaltyStrikeTtlSeconds
     ) {
         this.redisTemplate = redisTemplate;
         this.eventQueryRepository = eventQueryRepository;
@@ -42,6 +52,10 @@ public class VirtualQueueService {
         this.releaseBatchSize = Math.max(1, releaseBatchSize);
         this.accessTtlSeconds = Math.max(60, accessTtlSeconds);
         this.redisKeyTtl = Duration.ofSeconds(Math.max(this.accessTtlSeconds * 4, 3600));
+        this.reentryPenaltyEnabled = reentryPenaltyEnabled;
+        this.penaltyBaseSeconds = Math.max(30, penaltyBaseSeconds);
+        this.penaltyMaxSeconds = Math.max(this.penaltyBaseSeconds, penaltyMaxSeconds);
+        this.penaltyStrikeTtlSeconds = Math.max(this.penaltyMaxSeconds, penaltyStrikeTtlSeconds);
     }
 
     public synchronized VirtualQueueStatusResponse join(UUID eventId, UUID userId) {
@@ -53,6 +67,10 @@ public class VirtualQueueService {
         validateBookableEvent(eventId);
         long now = nowMillis();
         String member = member(userId);
+        long penaltyRemainingMillis = penaltyRemainingMillis(eventId, userId, now);
+        if (penaltyRemainingMillis > 0) {
+            return cooldownResponse(eventId, penaltyRemainingMillis);
+        }
 
         promoteWaitingUsers(eventId, now);
 
@@ -99,6 +117,10 @@ public class VirtualQueueService {
 
         long now = nowMillis();
         String member = member(userId);
+        long penaltyRemainingMillis = penaltyRemainingMillis(eventId, userId, now);
+        if (penaltyRemainingMillis > 0) {
+            return cooldownResponse(eventId, penaltyRemainingMillis);
+        }
 
         promoteWaitingUsers(eventId, now);
 
@@ -147,6 +169,14 @@ public class VirtualQueueService {
 
         long now = nowMillis();
         String member = member(userId);
+        long penaltyRemainingMillis = penaltyRemainingMillis(eventId, userId, now);
+        if (penaltyRemainingMillis > 0) {
+            long waitSeconds = Math.max(1, penaltyRemainingMillis / 1000);
+            throw new ApiException(
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "Please wait " + waitSeconds + "s before re-entering seat selection"
+            );
+        }
         cleanupExpiredActive(eventId, now);
 
         Double activeScore = redisTemplate.opsForZSet().score(activeKey(eventId), member);
@@ -158,6 +188,26 @@ public class VirtualQueueService {
         }
 
         grantAccess(eventId, member, now);
+    }
+
+    public void registerExpiredSeatLockStrike(UUID eventId, UUID userId, long seatCount) {
+        validateUser(userId);
+        if (!enabled || !reentryPenaltyEnabled || eventId == null) {
+            return;
+        }
+
+        long now = nowMillis();
+        long strikeCount = incrementStrike(eventId, userId);
+        long cooldownSeconds = penaltySecondsForStrike(strikeCount);
+        long cooldownUntil = now + cooldownSeconds * 1000;
+
+        redisTemplate.opsForValue().set(
+                penaltyUntilKey(eventId, userId),
+                String.valueOf(cooldownUntil),
+                Duration.ofSeconds(cooldownSeconds + 60)
+        );
+        redisTemplate.opsForZSet().remove(activeKey(eventId), member(userId));
+        redisTemplate.opsForZSet().remove(waitingKey(eventId), member(userId));
     }
 
     private void validateBookableEvent(UUID eventId) {
@@ -192,6 +242,7 @@ public class VirtualQueueService {
     private VirtualQueueStatusResponse waitingResponse(UUID eventId, String member) {
         Long rank = redisTemplate.opsForZSet().rank(waitingKey(eventId), member);
         Long position = rank == null ? null : rank + 1;
+        long waitSeconds = 5;
         return new VirtualQueueStatusResponse(
                 eventId,
                 "WAITING",
@@ -200,9 +251,21 @@ public class VirtualQueueService {
                 count(waitingKey(eventId)),
                 null,
                 releaseBatchSize,
-                position == null
-                        ? "Waiting room entry was not found"
-                        : "You are number " + position + " in the queue"
+                "Please wait " + waitSeconds + " seconds and check again"
+        );
+    }
+
+    private VirtualQueueStatusResponse cooldownResponse(UUID eventId, long penaltyRemainingMillis) {
+        long waitSeconds = Math.max(1, penaltyRemainingMillis / 1000);
+        return new VirtualQueueStatusResponse(
+                eventId,
+                "WAITING",
+                null,
+                count(activeKey(eventId)),
+                count(waitingKey(eventId)),
+                null,
+                releaseBatchSize,
+                "Please wait " + waitSeconds + " seconds before booking again"
         );
     }
 
@@ -241,6 +304,42 @@ public class VirtualQueueService {
         return score != null && score.longValue() > now;
     }
 
+    private long penaltyRemainingMillis(UUID eventId, UUID userId, long now) {
+        if (!enabled || !reentryPenaltyEnabled || eventId == null || userId == null) {
+            return 0;
+        }
+
+        String raw = redisTemplate.opsForValue().get(penaltyUntilKey(eventId, userId));
+        if (raw == null || raw.isBlank()) {
+            return 0;
+        }
+
+        try {
+            long until = Long.parseLong(raw.trim());
+            if (until <= now) {
+                redisTemplate.delete(penaltyUntilKey(eventId, userId));
+                return 0;
+            }
+            return until - now;
+        } catch (NumberFormatException ignored) {
+            redisTemplate.delete(penaltyUntilKey(eventId, userId));
+            return 0;
+        }
+    }
+
+    private long incrementStrike(UUID eventId, UUID userId) {
+        Long next = redisTemplate.opsForValue().increment(penaltyCountKey(eventId, userId));
+        redisTemplate.expire(penaltyCountKey(eventId, userId), Duration.ofSeconds(penaltyStrikeTtlSeconds));
+        return next == null ? 1 : Math.max(1, next);
+    }
+
+    private long penaltySecondsForStrike(long strikeCount) {
+        long power = Math.min(20, Math.max(0, strikeCount - 1));
+        long multiplier = 1L << power;
+        long calculated = penaltyBaseSeconds * multiplier;
+        return Math.min(penaltyMaxSeconds, calculated);
+    }
+
     private long count(String key) {
         Long count = redisTemplate.opsForZSet().zCard(key);
         return count == null ? 0 : count;
@@ -274,5 +373,13 @@ public class VirtualQueueService {
 
     private String sequenceKey(UUID eventId) {
         return KEY_PREFIX + eventId + ":sequence";
+    }
+
+    private String penaltyCountKey(UUID eventId, UUID userId) {
+        return PENALTY_COUNT_KEY_PREFIX + eventId + ":user:" + userId;
+    }
+
+    private String penaltyUntilKey(UUID eventId, UUID userId) {
+        return PENALTY_UNTIL_KEY_PREFIX + eventId + ":user:" + userId;
     }
 }

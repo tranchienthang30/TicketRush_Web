@@ -70,4 +70,13 @@ public class CheckoutController {
         checkoutService.completePayOSPayment(currentUserService.resolve(userId), orderCode);
         return new ApiMessageResponse("Payment completed successfully");
     }
+
+    @PostMapping("/payos/cancel")
+    public ApiMessageResponse cancelPayOSPayment(
+            @RequestHeader(name = "X-User-Id", required = false) UUID userId,
+            @RequestParam long orderCode
+    ) {
+        checkoutService.cancelPayOSPayment(currentUserService.resolve(userId), orderCode);
+        return new ApiMessageResponse("Payment cancelled successfully");
+    }
 }

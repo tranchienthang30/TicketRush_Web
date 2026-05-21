@@ -1,12 +1,24 @@
 <script setup>
 import { onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { cancelPayOSCheckout } from '@/api/ticketRushApi'
 
 const CHECKOUT_STORAGE_KEY = 'ticketrush_checkout_payload'
 const router = useRouter()
+const route = useRoute()
 
-onMounted(() => {
+onMounted(async () => {
   sessionStorage.removeItem(CHECKOUT_STORAGE_KEY)
+
+  const orderCode = Number(route.query.orderCode)
+  if (Number.isFinite(orderCode) && orderCode > 0) {
+    try {
+      await cancelPayOSCheckout(orderCode)
+    } catch {
+      // Ignore: webhook/scheduler may already handle status and lock release.
+    }
+  }
+
   window.setTimeout(() => {
     router.replace({ name: 'home' })
   }, 1200)

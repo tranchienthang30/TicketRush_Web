@@ -257,12 +257,7 @@ public class EventQueryRepository {
 
         if (query != null && !query.isBlank()) {
             where.append("""
-                    AND (
-                        e.title ILIKE :query
-                        OR e.description ILIKE :query
-                        OR e.city ILIKE :query
-                        OR e.location_name ILIKE :query
-                    )
+                    AND e.title ILIKE :query
                     """);
         }
 
@@ -281,7 +276,7 @@ public class EventQueryRepository {
         }
 
         if (query != null && !query.isBlank()) {
-            params.addValue("query", "%" + query.trim() + "%");
+            params.addValue("query", query.trim() + "%");
         }
 
         if (city != null && !city.isBlank()) {

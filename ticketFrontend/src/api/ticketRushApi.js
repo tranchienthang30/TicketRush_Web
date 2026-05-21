@@ -114,6 +114,13 @@ export async function completePayOSCheckout(orderCode) {
   return data;
 }
 
+export async function cancelPayOSCheckout(orderCode) {
+  const { data } = await apiClient.post("/api/me/checkout/payos/cancel", null, {
+    params: { orderCode },
+  });
+  return data;
+}
+
 export async function updateProfile(payload) {
   const { data } = await apiClient.put("/api/me", payload);
   return data;

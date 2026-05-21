@@ -13,7 +13,7 @@ import {
 } from '../api/ticketRushApi'
 
 const CHECKOUT_STORAGE_KEY = 'ticketrush_checkout_payload'
-const SELECT_TIMEOUT_SECONDS = 60
+const SELECT_TIMEOUT_SECONDS = 600
 const SEAT_POLL_INTERVAL_MS = 3000
 const QUEUE_POLL_INTERVAL_MS = 5000
 const TOAST_DURATION_MS = 3600
@@ -171,21 +171,12 @@ const categoryName = computed(() => {
 })
 
 const isWaitingRoom = computed(() => queueStatus.value?.status === 'WAITING')
-const queuePositionLabel = computed(() => {
-  const position = Number(queueStatus.value?.position)
-  return Number.isFinite(position) && position > 0 ? position.toLocaleString('vi-VN') : '...'
-})
-const queueAheadCount = computed(() => {
-  const position = Number(queueStatus.value?.position)
-  return Number.isFinite(position) && position > 1 ? position - 1 : 0
-})
-const queueProgressPercent = computed(() => {
-  const position = Number(queueStatus.value?.position)
-  const waitingUsers = Number(queueStatus.value?.waitingUsers)
-  if (!Number.isFinite(position) || !Number.isFinite(waitingUsers) || waitingUsers <= 1) {
-    return 8
-  }
-  return Math.max(8, Math.min(95, 100 - ((position - 1) / waitingUsers) * 100))
+const queueCooldownSeconds = computed(() => {
+  const message = String(queueStatus.value?.message || '')
+  const secondsMatch = message.match(/(\d+)\s*seconds?/i)
+  if (!secondsMatch) return null
+  const value = Number(secondsMatch[1])
+  return Number.isFinite(value) && value > 0 ? value : null
 })
 
 const eventInformation = computed(() => {
@@ -879,26 +870,10 @@ function seatsioCdnUrl() {
           Phòng chờ đặt vé
         </h2>
         <p class="mx-auto mt-4 max-w-xl text-base font-semibold leading-7 text-slate-600 dark:text-slate-300">
-          Bạn đang ở vị trí thứ
-          <span class="font-black text-brand-orange">{{ queuePositionLabel }}</span>
-          trong hàng đợi. Vui lòng không tải lại trang.
+          Vui lòng chờ
+          <span class="font-black text-brand-orange">{{ queueCooldownSeconds ?? '...' }}</span>
+          giây rồi thử lại.
         </p>
-
-        <div class="mx-auto mt-8 max-w-md rounded-2xl bg-slate-50 p-5 dark:bg-slate-900">
-          <div class="flex items-center justify-between text-sm font-black text-slate-600 dark:text-slate-300">
-            <span>Còn trước bạn</span>
-            <span>{{ queueAheadCount.toLocaleString('vi-VN') }} người</span>
-          </div>
-          <div class="mt-4 h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-            <div
-              class="h-full rounded-full bg-brand-orange transition-all duration-500"
-              :style="{ width: `${queueProgressPercent}%` }"
-            ></div>
-          </div>
-          <p class="mt-4 text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
-            Hệ thống sẽ tự chuyển bạn vào màn chọn ghế khi tới lượt
-          </p>
-        </div>
 
         <p
           v-if="queueError"
@@ -1013,6 +988,12 @@ function seatsioCdnUrl() {
                 </div>
                 <div class="flex items-center gap-2">
                   <span class="inline-block h-4 w-4 rounded bg-blue-500"></span> Your selection
+                </div>
+                <div class="flex items-center gap-2">
+                  <span
+                    class="inline-block h-4 w-4 rounded border border-amber-300 bg-amber-100"
+                  ></span>
+                  Temporarily locked
                 </div>
                 <div v-for="item in seatLegendItems" :key="`${item.label}-${item.color}`" class="flex items-center gap-2">
                   <span

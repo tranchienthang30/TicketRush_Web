@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { confirmCheckout, previewCheckout } from '../api/ticketRushApi'
 import { useAuthStore } from '@/stores/authStore'
@@ -19,6 +19,8 @@ const confirmResult = ref(null)
 const voucherCodeInput = ref('')
 const paymentMethod = ref('card')
 const agreedTerms = ref(false)
+const nowMs = ref(Date.now())
+let countdownTimerHandle = null
 const contact = ref({
   fullName: '',
   email: '',
@@ -51,7 +53,36 @@ const isConfirmDisabled = computed(() => {
   if (!contact.value.fullName.trim() || !contact.value.email.trim() || !contact.value.phone.trim())
     return true
   if (!agreedTerms.value) return true
+  if (isLockExpired.value) return true
   return confirmLoading.value || isRedirectingToPayOS.value
+})
+
+const checkoutLockExpiryMs = computed(() => {
+  const value = summary.value?.seatLockExpiresAt
+  if (!value) return null
+  const millis = new Date(value).getTime()
+  return Number.isFinite(millis) ? millis : null
+})
+
+const remainingLockSeconds = computed(() => {
+  const expiry = checkoutLockExpiryMs.value
+  if (!expiry) return null
+  return Math.max(0, Math.floor((expiry - nowMs.value) / 1000))
+})
+
+const isLockExpired = computed(() => {
+  const remaining = remainingLockSeconds.value
+  return remaining !== null && remaining <= 0
+})
+
+const remainingLockLabel = computed(() => {
+  const remaining = remainingLockSeconds.value
+  if (remaining === null) return '--:--'
+  const mins = Math.floor(remaining / 60)
+    .toString()
+    .padStart(2, '0')
+  const secs = (remaining % 60).toString().padStart(2, '0')
+  return `${mins}:${secs}`
 })
 
 function formatMoney(value) {
@@ -171,6 +202,10 @@ function fillContactFromCurrentUser() {
 }
 
 onMounted(async () => {
+  countdownTimerHandle = window.setInterval(() => {
+    nowMs.value = Date.now()
+  }, 1000)
+
   if (!authStore.user) {
     try {
       await authStore.fetchCurrentUser()
@@ -182,6 +217,12 @@ onMounted(async () => {
   loadCheckoutPayload()
   if (hasCheckoutData.value) {
     await loadPreview(null)
+  }
+})
+
+onUnmounted(() => {
+  if (countdownTimerHandle) {
+    clearInterval(countdownTimerHandle)
   }
 })
 </script>
@@ -385,6 +426,25 @@ onMounted(async () => {
             </div>
 
             <div v-else-if="summary" class="mt-6 space-y-4">
+              <div
+                class="rounded-2xl border px-4 py-4"
+                :class="
+                  isLockExpired
+                    ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/70 dark:text-red-200'
+                    : 'border-orange-200 bg-orange-50 text-brand-orange dark:border-orange-900 dark:bg-orange-950/70 dark:text-orange-200'
+                "
+              >
+                <p class="text-xs font-black uppercase tracking-[0.18em]">Time remaining</p>
+                <p class="mt-2 text-2xl font-black">{{ remainingLockLabel }}</p>
+                <p class="mt-1 text-sm font-bold">
+                  {{
+                    isLockExpired
+                      ? 'Seat lock expired. Please go back and select seats again.'
+                      : 'From seat lock until payment completion.'
+                  }}
+                </p>
+              </div>
+
               <div class="rounded-2xl bg-slate-50 px-4 py-4 dark:bg-slate-900">
                 <p
                   class="text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300"

@@ -93,7 +93,7 @@ app:
     min-score: "${RECAPTCHA_MIN_SCORE:0.5}"
 
   booking:
-    lock-minutes: 1
+    lock-minutes: 10
     expire-interval-ms: 15000
     expire-initial-delay-ms: 15000
 
@@ -102,6 +102,10 @@ app:
     max-active-users: "${VIRTUAL_QUEUE_MAX_ACTIVE_USERS:50}"
     release-batch-size: "${VIRTUAL_QUEUE_RELEASE_BATCH_SIZE:50}"
     access-ttl-seconds: "${VIRTUAL_QUEUE_ACCESS_TTL_SECONDS:900}"
+    reentry-penalty-enabled: "${VIRTUAL_QUEUE_REENTRY_PENALTY_ENABLED:true}"
+    reentry-penalty-base-seconds: "${VIRTUAL_QUEUE_REENTRY_PENALTY_BASE_SECONDS:120}"
+    reentry-penalty-max-seconds: "${VIRTUAL_QUEUE_REENTRY_PENALTY_MAX_SECONDS:3600}"
+    reentry-penalty-strike-ttl-seconds: "${VIRTUAL_QUEUE_REENTRY_PENALTY_STRIKE_TTL_SECONDS:86400}"
 
   upload:
     dir: "${UPLOAD_DIR:uploads}"
