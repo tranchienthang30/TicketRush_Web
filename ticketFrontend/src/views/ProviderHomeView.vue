@@ -4,7 +4,7 @@
       <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <p class="text-sm font-black uppercase tracking-[0.25em] text-brand-orange">Provider</p>
         <h1 class="mt-3 text-4xl font-black tracking-tight text-brand-navy dark:text-white">
-          Welcome to TicketRush Provider Workspace
+          Welcome to Starlight Provider Workspace
         </h1>
         <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-600 dark:text-slate-300">
           This workspace is for creating and managing your own events. Provider accounts are separated from the customer booking flow, so public event browsing and seat booking are not shown here.

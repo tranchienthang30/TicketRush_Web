@@ -3,8 +3,15 @@ package com.example.ticket.config;
 import com.example.ticket.security.JwtAuthenticationFilter;
 import com.example.ticket.security.OAuth2AuthenticationFailureHandler;
 import com.example.ticket.security.OAuth2AuthenticationSuccessHandler;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 
 @Configuration
 public class SecurityConfig {
@@ -24,7 +31,8 @@ public class SecurityConfig {
 
     @Bean
     org.springframework.security.web.SecurityFilterChain securityFilterChain(
-            org.springframework.security.config.annotation.web.builders.HttpSecurity http
+            org.springframework.security.config.annotation.web.builders.HttpSecurity http,
+            ClientRegistrationRepository clientRegistrationRepository
     ) throws Exception {
         return http
                 .csrf(org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer::disable)
@@ -55,6 +63,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(authorization -> authorization
+                                .authorizationRequestResolver(authorizationRequestResolver(clientRegistrationRepository)))
                         .successHandler(oauth2SuccessHandler)
                         .failureHandler(oauth2FailureHandler))
                 .addFilterBefore(
@@ -62,5 +72,34 @@ public class SecurityConfig {
                         org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class
                 )
                 .build();
+    }
+
+    private OAuth2AuthorizationRequestResolver authorizationRequestResolver(
+            ClientRegistrationRepository clientRegistrationRepository
+    ) {
+        DefaultOAuth2AuthorizationRequestResolver resolver =
+                new DefaultOAuth2AuthorizationRequestResolver(clientRegistrationRepository, "/oauth2/authorization");
+        return new OAuth2AuthorizationRequestResolver() {
+            @Override
+            public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
+                return customize(resolver.resolve(request));
+            }
+
+            @Override
+            public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String clientRegistrationId) {
+                return customize(resolver.resolve(request, clientRegistrationId));
+            }
+
+            private OAuth2AuthorizationRequest customize(OAuth2AuthorizationRequest authorizationRequest) {
+                if (authorizationRequest == null) {
+                    return null;
+                }
+                Map<String, Object> additionalParameters = new HashMap<>(authorizationRequest.getAdditionalParameters());
+                additionalParameters.put("prompt", "select_account");
+                return OAuth2AuthorizationRequest.from(authorizationRequest)
+                        .additionalParameters(additionalParameters)
+                        .build();
+            }
+        };
     }
 }

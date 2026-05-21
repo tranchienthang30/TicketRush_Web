@@ -41,9 +41,11 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
 
         try {
             AuthSessionResponse session = authService.authenticateGoogleUser(email, name, providerId, picture);
+            authCookieService.clearAuthCookies(response);
             authCookieService.addAuthCookies(response, session);
             response.sendRedirect(frontendUrl + "/oauth2/callback");
         } catch (Exception ex) {
+            authCookieService.clearAuthCookies(response);
             String message = URLEncoder.encode(ex.getMessage(), StandardCharsets.UTF_8);
             response.sendRedirect(frontendUrl + "/login?oauthError=" + message);
         }

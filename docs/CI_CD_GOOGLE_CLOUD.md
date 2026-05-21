@@ -206,8 +206,9 @@ Nginx đang route:
 ```text
 /                  -> Vue SPA
 /api/              -> Spring Boot
-/oauth2/           -> Spring Boot Google OAuth
+/oauth2/authorization/ -> Spring Boot Google OAuth start
 /login/oauth2/     -> Spring Boot OAuth callback
+/oauth2/callback   -> Vue SPA OAuth result page
 /uploads/          -> Spring Boot static upload handler
 /actuator/         -> 404 public
 ```

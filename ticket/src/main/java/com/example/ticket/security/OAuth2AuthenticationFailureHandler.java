@@ -13,15 +13,21 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class OAuth2AuthenticationFailureHandler implements AuthenticationFailureHandler {
+    private final AuthCookieService authCookieService;
     private final String frontendUrl;
 
-    public OAuth2AuthenticationFailureHandler(@Value("${frontend.url}") String frontendUrl) {
+    public OAuth2AuthenticationFailureHandler(
+            AuthCookieService authCookieService,
+            @Value("${frontend.url}") String frontendUrl
+    ) {
+        this.authCookieService = authCookieService;
         this.frontendUrl = frontendUrl;
     }
 
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception)
             throws IOException, ServletException {
+        authCookieService.clearAuthCookies(response);
         String message = URLEncoder.encode("Google sign-in failed. Please try again.", StandardCharsets.UTF_8);
         response.sendRedirect(frontendUrl + "/login?oauthError=" + message);
     }

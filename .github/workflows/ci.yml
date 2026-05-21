@@ -2,9 +2,13 @@ name: CI
 
 on:
   pull_request:
+    branches:
+      - main
+      - luuLoad
   push:
     branches:
       - main
+      - luuLoad
 
 jobs:
   backend:
@@ -94,5 +98,5 @@ jobs:
         env:
           VITE_API_BASE_URL: http://localhost
           VITE_QR_PUBLIC_BASE_URL: http://localhost
-          VITE_SEATSIO_REGION: eu
+          VITE_SEATSIO_REGION: oc
         run: npm run build
