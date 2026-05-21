@@ -8,6 +8,7 @@ import com.example.ticket.service.CurrentUserService;
 import com.example.ticket.dto.response.EventResponse;
 import com.example.ticket.dto.response.ProviderBookingSummaryResponse;
 import com.example.ticket.service.EventService;
+import com.example.ticket.service.VirtualQueueService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -28,10 +29,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class EventController {
     private final EventService eventService;
     private final CurrentUserService currentUserService;
+    private final VirtualQueueService virtualQueueService;
 
-    public EventController(EventService eventService, CurrentUserService currentUserService) {
+    public EventController(
+            EventService eventService,
+            CurrentUserService currentUserService,
+            VirtualQueueService virtualQueueService
+    ) {
         this.eventService = eventService;
         this.currentUserService = currentUserService;
+        this.virtualQueueService = virtualQueueService;
     }
 
     @GetMapping("/events")
@@ -57,10 +64,8 @@ public class EventController {
             @RequestHeader(name = "X-User-Id", required = false) UUID userId,
             @PathVariable UUID eventId
     ) {
-        UUID viewerUserId = currentUserService.resolveOptional();
-        if (viewerUserId == null) {
-            viewerUserId = userId;
-        }
+        UUID viewerUserId = currentUserService.resolve(userId);
+        virtualQueueService.requireAccess(eventId, viewerUserId);
         return eventService.getBookingEvent(eventId, viewerUserId);
     }
 

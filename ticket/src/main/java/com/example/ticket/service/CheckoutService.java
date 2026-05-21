@@ -42,21 +42,25 @@ public class CheckoutService {
     private final CheckoutQueryRepository checkoutRepository;
     private final PayOSPaymentService payOSPaymentService;
     private final PaymentConfirmationEmailService paymentConfirmationEmailService;
+    private final VirtualQueueService virtualQueueService;
     private final int bookingLockMinutes;
 
     public CheckoutService(
             CheckoutQueryRepository checkoutRepository,
             PayOSPaymentService payOSPaymentService,
             PaymentConfirmationEmailService paymentConfirmationEmailService,
+            VirtualQueueService virtualQueueService,
             @Value("${app.booking.lock-minutes:1}") int bookingLockMinutes
     ) {
         this.checkoutRepository = checkoutRepository;
         this.payOSPaymentService = payOSPaymentService;
         this.paymentConfirmationEmailService = paymentConfirmationEmailService;
+        this.virtualQueueService = virtualQueueService;
         this.bookingLockMinutes = bookingLockMinutes;
     }
 
     public CheckoutSummaryResponse preview(UUID userId, CheckoutPreviewRequest request) {
+        virtualQueueService.requireAccess(request.eventId(), userId);
         CheckoutEvaluation evaluation = evaluate(
                 userId,
                 request.eventId(),
@@ -70,6 +74,7 @@ public class CheckoutService {
 
     @Transactional
     public SeatLockResponse lockSeats(UUID userId, SeatLockRequest request) {
+        virtualQueueService.requireAccess(request.eventId(), userId);
         List<UUID> seatIds = normalizeSeatIds(request.seatIds());
         OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
         OffsetDateTime lockExpiresAt = now.plusMinutes(bookingLockMinutes);
@@ -136,6 +141,7 @@ public class CheckoutService {
 
     @Transactional
     public CheckoutResultResponse confirm(UUID userId, CheckoutConfirmRequest request) {
+        virtualQueueService.requireAccess(request.eventId(), userId);
         CheckoutEvaluation evaluation = evaluate(
                 userId,
                 request.eventId(),
@@ -212,6 +218,7 @@ public class CheckoutService {
             );
 
             log.info("Checkout created in pending state for orderId={}, redirecting to payOS", orderId);
+            virtualQueueService.leave(evaluation.event().id(), userId);
             return new CheckoutResultResponse(
                     orderId,
                     "PENDING",
@@ -236,6 +243,7 @@ public class CheckoutService {
                 ))
                 .toList();
         sendOrderSuccessEmail(orderId);
+        virtualQueueService.leave(evaluation.event().id(), userId);
 
         return new CheckoutResultResponse(
                 orderId,
