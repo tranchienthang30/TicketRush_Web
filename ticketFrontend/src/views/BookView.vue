@@ -13,6 +13,7 @@ import {
 } from '../api/ticketRushApi'
 
 const CHECKOUT_STORAGE_KEY = 'ticketrush_checkout_payload'
+const BOOKING_TIMER_STORAGE_KEY = 'ticketrush_booking_timer'
 const SELECT_TIMEOUT_SECONDS = 600
 const SEAT_POLL_INTERVAL_MS = 3000
 const QUEUE_POLL_INTERVAL_MS = 5000
@@ -525,6 +526,50 @@ function continueToCheckout() {
   router.push('/checkout')
 }
 
+function loadPersistedBookingDeadline(eventId) {
+  if (!eventId) return null
+  const raw = sessionStorage.getItem(BOOKING_TIMER_STORAGE_KEY)
+  if (!raw) return null
+
+  try {
+    const payload = JSON.parse(raw)
+    const storedEventId = String(payload?.eventId || '')
+    const deadlineMs = Number(payload?.deadlineMs)
+    if (storedEventId !== String(eventId) || !Number.isFinite(deadlineMs)) {
+      return null
+    }
+    return deadlineMs
+  } catch {
+    return null
+  }
+}
+
+function persistBookingDeadline(eventId, deadlineMs) {
+  if (!eventId || !Number.isFinite(deadlineMs)) return
+  sessionStorage.setItem(
+    BOOKING_TIMER_STORAGE_KEY,
+    JSON.stringify({
+      eventId: String(eventId),
+      deadlineMs,
+    }),
+  )
+}
+
+function ensureBookingDeadline(eventId) {
+  const now = Date.now()
+  const persisted = loadPersistedBookingDeadline(eventId)
+  if (persisted && persisted > now) {
+    bookingCountdownDeadlineMs.value = persisted
+    timerSeconds.value = Math.max(0, Math.floor((persisted - now) / 1000))
+    return
+  }
+
+  const deadline = now + SELECT_TIMEOUT_SECONDS * 1000
+  bookingCountdownDeadlineMs.value = deadline
+  timerSeconds.value = SELECT_TIMEOUT_SECONDS
+  persistBookingDeadline(eventId, deadline)
+}
+
 function pushBookingToast(message, tone = 'info') {
   const id = toastSequence++
   const toast = { id, message, tone }
@@ -726,8 +771,7 @@ async function loadBookingData() {
       return
     }
 
-    bookingCountdownDeadlineMs.value = Date.now() + SELECT_TIMEOUT_SECONDS * 1000
-    timerSeconds.value = SELECT_TIMEOUT_SECONDS
+    ensureBookingDeadline(eventId)
 
     const hasQueueAccess = await ensureQueueAccess(eventId)
     if (!hasQueueAccess) {

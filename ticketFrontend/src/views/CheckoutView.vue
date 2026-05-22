@@ -1,10 +1,11 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { confirmCheckout, previewCheckout } from '../api/ticketRushApi'
 import { useAuthStore } from '@/stores/authStore'
 
 const CHECKOUT_STORAGE_KEY = 'ticketrush_checkout_payload'
+const BOOKING_TIMER_STORAGE_KEY = 'ticketrush_booking_timer'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -64,8 +65,25 @@ const checkoutLockExpiryMs = computed(() => {
   return Number.isFinite(millis) ? millis : null
 })
 
+const sharedBookingExpiryMs = computed(() => {
+  if (!checkoutPayload.value?.eventId) return null
+  const raw = sessionStorage.getItem(BOOKING_TIMER_STORAGE_KEY)
+  if (!raw) return null
+
+  try {
+    const payload = JSON.parse(raw)
+    if (String(payload?.eventId || '') !== String(checkoutPayload.value.eventId)) {
+      return null
+    }
+    const millis = Number(payload?.deadlineMs)
+    return Number.isFinite(millis) ? millis : null
+  } catch {
+    return null
+  }
+})
+
 const remainingLockSeconds = computed(() => {
-  const expiry = checkoutLockExpiryMs.value
+  const expiry = sharedBookingExpiryMs.value ?? checkoutLockExpiryMs.value
   if (!expiry) return null
   return Math.max(0, Math.floor((expiry - nowMs.value) / 1000))
 })
@@ -83,6 +101,11 @@ const remainingLockLabel = computed(() => {
     .padStart(2, '0')
   const secs = (remaining % 60).toString().padStart(2, '0')
   return `${mins}:${secs}`
+})
+
+watch(remainingLockSeconds, (seconds) => {
+  if (seconds === null || seconds > 0) return
+  router.replace({ name: 'home', query: { booking: 'expired' } })
 })
 
 function formatMoney(value) {
@@ -190,6 +213,10 @@ async function submitCheckout() {
 }
 
 function goBackToBooking() {
+  if (checkoutPayload.value?.eventId) {
+    router.push({ path: '/booking', query: { eventId: checkoutPayload.value.eventId } })
+    return
+  }
   router.push('/booking')
 }
 
