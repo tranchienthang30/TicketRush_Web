@@ -34,8 +34,8 @@ spring:
 
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: "${REDIS_HOST:localhost}"
+      port: "${REDIS_PORT:6379}"
 
   cache:
     type: redis
@@ -85,7 +85,7 @@ app:
     min-score: "${RECAPTCHA_MIN_SCORE:0.5}"
 
   booking:
-    lock-minutes: 10
+    lock-minutes: 1
     expire-interval-ms: 15000
     expire-initial-delay-ms: 15000
 
