@@ -93,7 +93,7 @@ app:
     min-score: "${RECAPTCHA_MIN_SCORE:0.5}"
 
   booking:
-    lock-minutes: 1
+    lock-minutes: 10
     expire-interval-ms: 15000
     expire-initial-delay-ms: 15000
 

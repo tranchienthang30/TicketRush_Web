@@ -13,7 +13,7 @@ import {
 } from '../api/ticketRushApi'
 
 const CHECKOUT_STORAGE_KEY = 'ticketrush_checkout_payload'
-const SELECT_TIMEOUT_SECONDS = 60
+const SELECT_TIMEOUT_SECONDS = 600
 const SEAT_POLL_INTERVAL_MS = 3000
 const QUEUE_POLL_INTERVAL_MS = 5000
 const TOAST_DURATION_MS = 3600
