@@ -141,7 +141,7 @@ watch(
       </h1>
       <p class="text-blue-100 max-w-2xl mx-auto text-lg">
         <template v-if="activeQuery">
-          Showing events that start with "{{ activeQuery }}".
+          Showing events that match "{{ activeQuery }}".
         </template>
         <template v-else>
           Browse tickets by section, then by category: Music, Show, Concert, Cinema, Sport, Festival, and more.

@@ -264,7 +264,7 @@ public class EventQueryRepository {
 
         if (query != null && !query.isBlank()) {
             where.append("""
-                    AND e.title ILIKE :query
+                    AND e.title ~* :query
                     """);
         }
 
@@ -283,7 +283,7 @@ public class EventQueryRepository {
         }
 
         if (query != null && !query.isBlank()) {
-            params.addValue("query", query.trim() + "%");
+            params.addValue("query", "(^|[^[:alnum:]])" + quoteRegex(query.trim()));
         }
 
         if (city != null && !city.isBlank()) {
@@ -311,6 +311,10 @@ public class EventQueryRepository {
                 rs.getObject("duration_minutes", Integer.class),
                 rs.getString("listing_type")
         );
+    }
+
+    private String quoteRegex(String value) {
+        return value.replaceAll("([\\\\.\\[\\]{}()*+?^$|])", "\\\\$1");
     }
 
     private BookingEventRow mapBookingEventRow(ResultSet rs, int rowNum) throws SQLException {
