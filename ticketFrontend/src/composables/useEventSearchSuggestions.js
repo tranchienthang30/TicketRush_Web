@@ -2,7 +2,7 @@ import { computed, onUnmounted, ref, watch } from "vue";
 import { getEvents } from "@/api/ticketRushApi";
 
 export function useEventSearchSuggestions(searchTerm, options = {}) {
-  const minLength = options.minLength ?? 2;
+  const minLength = options.minLength ?? 1;
   const size = options.size ?? 6;
   const delayMs = options.delayMs ?? 220;
 
