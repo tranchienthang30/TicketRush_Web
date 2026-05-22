@@ -93,7 +93,7 @@ app:
     min-score: "${RECAPTCHA_MIN_SCORE:0.5}"
 
   booking:
-    lock-minutes: 10
+    lock-minutes: 1
     expire-interval-ms: 15000
     expire-initial-delay-ms: 15000
 
@@ -118,7 +118,7 @@ app:
     cancel-url: "${PAYOS_CANCEL_URL:http://localhost:5173/checkout/cancel}"
 
   seatsio:
-    region: "${SEATSIO_REGION:eu}"
+    region: "${SEATSIO_REGION:oc}"
     admin-key: "${SEATSIO_ADMIN_KEY:}"
     sandbox: "${SEATSIO_SANDBOX:false}"
 

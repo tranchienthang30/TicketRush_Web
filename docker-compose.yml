@@ -14,8 +14,11 @@ services:
   redis:
     image: redis:7
     container_name: ticketrush-redis
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
+    volumes:
+      - ticketrush_redis_data:/data
 
   mailpit:
     image: axllent/mailpit:latest
@@ -25,3 +28,4 @@ services:
       - "8025:8025"
 volumes:
   ticketrush_postgres_data:
+  ticketrush_redis_data:

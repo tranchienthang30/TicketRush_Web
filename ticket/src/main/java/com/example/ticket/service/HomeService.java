@@ -18,3 +18,4 @@ public class HomeService {
         return new HomeResponse(eventService.getGroupedEvents(4));
     }
 }
+

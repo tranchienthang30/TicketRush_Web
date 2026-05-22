@@ -13,7 +13,7 @@ import {
 } from '../api/ticketRushApi'
 
 const CHECKOUT_STORAGE_KEY = 'ticketrush_checkout_payload'
-const SELECT_TIMEOUT_SECONDS = 600
+const SELECT_TIMEOUT_SECONDS = 60
 const SEAT_POLL_INTERVAL_MS = 3000
 const QUEUE_POLL_INTERVAL_MS = 5000
 const TOAST_DURATION_MS = 3600
@@ -38,6 +38,8 @@ const queueError = ref('')
 const selectedSeatsioObjects = ref([])
 const seatsioRenderError = ref('')
 const timerSeconds = ref(SELECT_TIMEOUT_SECONDS)
+const bookingCountdownDeadlineMs = ref(null)
+const hasRedirectedOnTimeout = ref(false)
 let timerHandle = null
 let pollHandle = null
 let queuePollHandle = null
@@ -184,14 +186,6 @@ const totalPrice = computed(() =>
     ? selectedSeatsioTotal.value
     : selectedSeats.value.reduce((sum, seat) => sum + Number(seat.price || 0), 0),
 )
-const activeLockExpiryMs = computed(() => {
-  const lockExpiryValues = selectedSeats.value
-    .map((seat) => (seat.lockExpiresAt ? new Date(seat.lockExpiresAt).getTime() : null))
-    .filter((value) => Number.isFinite(value))
-
-  if (lockExpiryValues.length === 0) return null
-  return Math.min(...lockExpiryValues)
-})
 const categoryName = computed(() => {
   const categoryId = Number(eventDetail.value?.categoryId)
   if (!Number.isFinite(categoryId) || categoryId <= 0) {
@@ -303,7 +297,9 @@ function rowToIndex(rowLabel) {
 }
 
 function normalizeSeatLegendLabel(rawLabel) {
-  const normalized = String(rawLabel || '').trim().toUpperCase()
+  const normalized = String(rawLabel || '')
+    .trim()
+    .toUpperCase()
   if (normalized.includes('COUPLE')) return 'Couple'
   if (normalized.includes('VIP')) return 'VIP'
   if (normalized.includes('STANDARD')) return 'Standard'
@@ -343,7 +339,9 @@ function formatDuration(value) {
 }
 
 function normalizeHexColor(color) {
-  const normalized = String(color || '').trim().toUpperCase()
+  const normalized = String(color || '')
+    .trim()
+    .toUpperCase()
   return /^#[0-9A-F]{6}$/.test(normalized) ? normalized : ''
 }
 
@@ -596,15 +594,22 @@ function syncSeatChangeToasts(nextSnapshot) {
 function startTimer() {
   clearInterval(timerHandle)
   timerHandle = setInterval(() => {
-    const activeExpiry = activeLockExpiryMs.value
-    if (!activeExpiry) {
-      timerSeconds.value = SELECT_TIMEOUT_SECONDS
+    const countdownDeadline = bookingCountdownDeadlineMs.value
+    if (!countdownDeadline) {
       return
     }
 
-    const remainingSeconds = Math.max(0, Math.floor((activeExpiry - Date.now()) / 1000))
+    const remainingSeconds = Math.max(0, Math.floor((countdownDeadline - Date.now()) / 1000))
     timerSeconds.value = remainingSeconds
   }, 1000)
+}
+
+function redirectHomeOnTimeout() {
+  if (hasRedirectedOnTimeout.value) return
+  hasRedirectedOnTimeout.value = true
+  selectedSeatIds.value = []
+  clearQueuePolling()
+  router.replace({ name: 'home', query: { booking: 'expired' } })
 }
 
 function syncSelectedLocksFromServer() {
@@ -694,6 +699,7 @@ async function loadBookingData() {
   clearInterval(pollHandle)
   clearQueuePolling()
   loading.value = true
+  hasRedirectedOnTimeout.value = false
   error.value = ''
   needsEventSelection.value = false
   seatActionError.value = ''
@@ -719,6 +725,9 @@ async function loadBookingData() {
       needsEventSelection.value = true
       return
     }
+
+    bookingCountdownDeadlineMs.value = Date.now() + SELECT_TIMEOUT_SECONDS * 1000
+    timerSeconds.value = SELECT_TIMEOUT_SECONDS
 
     const hasQueueAccess = await ensureQueueAccess(eventId)
     if (!hasQueueAccess) {
@@ -771,6 +780,12 @@ onUnmounted(() => {
   clearInterval(pollHandle)
   clearQueuePolling()
   destroySeatsioChart()
+})
+
+watch(timerSeconds, (seconds) => {
+  if (seconds > 0) return
+  if (loading.value || error.value || needsEventSelection.value || isWaitingRoom.value) return
+  redirectHomeOnTimeout()
 })
 
 async function renderSeatsioChart() {
@@ -887,7 +902,9 @@ function seatsioObjectCategory(object) {
     </div>
 
     <section class="mx-auto max-w-7xl px-4 pt-8 md:px-8">
-      <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800 md:p-8">
+      <div
+        class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800 md:p-8"
+      >
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p class="text-sm font-black uppercase tracking-[0.2em] text-brand-orange">Booking</p>
@@ -902,7 +919,8 @@ function seatsioObjectCategory(object) {
 
           <div class="grid gap-2 text-right">
             <p class="text-sm font-bold text-slate-700 dark:text-slate-200">
-              Start time: <span class="text-brand-navy dark:text-brand-orange">{{ showtimeLabel }}</span>
+              Start time:
+              <span class="text-brand-navy dark:text-brand-orange">{{ showtimeLabel }}</span>
             </p>
             <p
               class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-200"
@@ -933,7 +951,9 @@ function seatsioObjectCategory(object) {
         v-else-if="needsEventSelection"
         class="rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center dark:border-amber-800 dark:bg-amber-950/60"
       >
-        <p class="text-lg font-black text-amber-800 dark:text-amber-100">Please select an event first.</p>
+        <p class="text-lg font-black text-amber-800 dark:text-amber-100">
+          Please select an event first.
+        </p>
         <p class="mt-2 text-sm font-semibold text-amber-700 dark:text-amber-200">
           Go to Events, choose your event, then continue to Booking.
         </p>
@@ -953,10 +973,10 @@ function seatsioObjectCategory(object) {
         <p class="text-xs font-black uppercase tracking-[0.22em] text-brand-orange">
           Virtual Queue
         </p>
-        <h2 class="mt-3 text-3xl font-black text-brand-navy dark:text-white">
-          Phòng chờ đặt vé
-        </h2>
-        <p class="mx-auto mt-4 max-w-xl text-base font-semibold leading-7 text-slate-600 dark:text-slate-300">
+        <h2 class="mt-3 text-3xl font-black text-brand-navy dark:text-white">Phòng chờ đặt vé</h2>
+        <p
+          class="mx-auto mt-4 max-w-xl text-base font-semibold leading-7 text-slate-600 dark:text-slate-300"
+        >
           Vui lòng chờ
           <span class="font-black text-brand-orange">{{ queueCooldownSeconds ?? '...' }}</span>
           giây rồi thử lại.
@@ -1025,7 +1045,9 @@ function seatsioObjectCategory(object) {
               <div class="overflow-x-auto">
                 <div class="mx-auto min-w-[760px] max-w-4xl space-y-2">
                   <div v-for="row in rowGroups" :key="row.rowLabel" class="flex items-center gap-2">
-                    <div class="w-6 text-center text-xs font-black text-slate-500 dark:text-slate-300">
+                    <div
+                      class="w-6 text-center text-xs font-black text-slate-500 dark:text-slate-300"
+                    >
                       {{ row.rowLabel }}
                     </div>
                     <div class="grid w-[664px] grid-cols-[repeat(14,minmax(0,1fr))] gap-2">
@@ -1049,7 +1071,9 @@ function seatsioObjectCategory(object) {
                         <span v-else>{{ unit.label }}</span>
                       </button>
                     </div>
-                    <div class="w-6 text-center text-xs font-black text-slate-500 dark:text-slate-300">
+                    <div
+                      class="w-6 text-center text-xs font-black text-slate-500 dark:text-slate-300"
+                    >
                       {{ row.rowLabel }}
                     </div>
                   </div>
@@ -1095,10 +1119,14 @@ function seatsioObjectCategory(object) {
               </div>
             </div>
 
-            <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <div
+              class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+            >
               <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
+                  <p
+                    class="text-xs font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300"
+                  >
                     {{ usesSeatsio ? 'Selected objects' : 'Selected Seats' }}
                   </p>
                   <p class="mt-2 text-xl font-black text-brand-navy dark:text-white">
@@ -1108,8 +1136,8 @@ function seatsioObjectCategory(object) {
                           ? selectedSeatsioLabels.join(', ')
                           : 'No seats selected'
                         : selectedSeatCodes.length > 0
-                        ? selectedSeatCodes.join(', ')
-                        : 'No seats selected'
+                          ? selectedSeatCodes.join(', ')
+                          : 'No seats selected'
                     }}
                   </p>
                   <div
@@ -1126,7 +1154,11 @@ function seatsioObjectCategory(object) {
                   </div>
                 </div>
                 <div>
-                  <p class="text-xs font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">Total</p>
+                  <p
+                    class="text-xs font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300"
+                  >
+                    Total
+                  </p>
                   <p class="mt-2 text-2xl font-black text-brand-orange">
                     {{ formatMoney(totalPrice) }}
                   </p>
@@ -1155,7 +1187,9 @@ function seatsioObjectCategory(object) {
           </section>
 
           <aside class="space-y-6">
-            <div class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <div
+              class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
+            >
               <div class="h-[240px] bg-slate-100 dark:bg-slate-900">
                 <img
                   :src="eventDetail?.bannerUrl || bookingEvent?.bannerUrl || fallbackImage"
@@ -1179,13 +1213,18 @@ function seatsioObjectCategory(object) {
               </div>
             </div>
 
-            <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <div
+              class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+            >
               <div class="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                 <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Venue</p>
                 <p class="mt-2 text-sm font-black text-slate-800 dark:text-white">
                   {{ eventDetail?.locationName || bookingEvent?.location || 'Venue TBA' }}
                 </p>
-                <p v-if="eventDetail?.address" class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                <p
+                  v-if="eventDetail?.address"
+                  class="mt-1 text-sm text-slate-600 dark:text-slate-300"
+                >
                   {{ eventDetail.address }}
                 </p>
                 <p v-if="eventDetail?.city" class="mt-1 text-sm text-slate-600 dark:text-slate-300">
@@ -1206,7 +1245,9 @@ function seatsioObjectCategory(object) {
                     <dt class="text-xs font-black uppercase tracking-[0.1em] text-slate-400">
                       {{ fact.label }}
                     </dt>
-                    <dd class="max-w-[68%] text-right text-sm font-bold text-slate-700 dark:text-slate-200">
+                    <dd
+                      class="max-w-[68%] text-right text-sm font-bold text-slate-700 dark:text-slate-200"
+                    >
                       {{ fact.value }}
                     </dd>
                   </div>
@@ -1228,7 +1269,9 @@ function seatsioObjectCategory(object) {
                   <dt class="text-[11px] font-black uppercase tracking-[0.08em] text-slate-400">
                     {{ credit.label }}
                   </dt>
-                  <dd class="mt-1 text-sm font-bold text-slate-700 dark:text-slate-200">{{ credit.value }}</dd>
+                  <dd class="mt-1 text-sm font-bold text-slate-700 dark:text-slate-200">
+                    {{ credit.value }}
+                  </dd>
                 </div>
               </dl>
             </div>
