@@ -773,7 +773,7 @@ function loadSeatsioScript(cdnUrl) {
             <li v-for="step in [
               { id: 1, label: 'Event information' },
               { id: 2, label: 'Seat setup' },
-              { id: 3, label: 'Payment & confirmation' }
+              { id: 3, label: 'Payout & confirmation' }
             ]" :key="step.id" :title="step.label" :class="isAdvancedSeatSetup ? 'flex justify-center' : 'flex items-center gap-3'">
               <span
                 :class="[
@@ -1127,24 +1127,45 @@ function loadSeatsioScript(cdnUrl) {
           </div>
 
           <div v-if="currentStep === 3" class="space-y-5">
-            <h2 class="text-xl font-black text-slate-900 dark:text-white">Payment & confirmation</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div>
+              <p class="text-sm font-black uppercase tracking-[0.18em] text-brand-orange">Settlement setup</p>
+              <h2 class="mt-2 text-xl font-black text-slate-900 dark:text-white">Payout information & confirmation</h2>
+              <p class="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500 dark:text-slate-300">
+                TicketRush collects customer payments through the platform payment account. This bank
+                account is used for provider payout after reconciliation.
+              </p>
+            </div>
+
+            <div class="rounded-xl border border-blue-200 bg-blue-50 p-5 text-sm font-bold leading-6 text-blue-950 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-100">
+              <p class="font-black">Revenue rule</p>
+              <p class="mt-2">
+                TicketRush applies a 5% platform fee to each paid ticket. The remaining provider
+                revenue is settled to the payout account below. In this demo, payout transfer is
+                recorded as settlement information and is not an automatic bank disbursement.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
               <label class="block">
-                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Bank name</span>
-                <input v-model.trim="form.payoutBankName" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white" />
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Payout bank</span>
+                <input v-model.trim="form.payoutBankName" placeholder="e.g. Vietcombank" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
               </label>
               <label class="block">
-                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Account name</span>
-                <input v-model.trim="form.payoutAccountName" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white" />
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Account holder</span>
+                <input v-model.trim="form.payoutAccountName" placeholder="Legal account holder name" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
               </label>
               <label class="block">
-                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Account number</span>
-                <input v-model.trim="form.payoutAccountNumber" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 dark:text-white" />
+                <span class="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">Payout account number</span>
+                <input v-model.trim="form.payoutAccountNumber" placeholder="Bank account number" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white" />
               </label>
             </div>
-            <label class="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+            <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
               <input v-model="form.termsAccepted" type="checkbox" class="mt-1" />
-              <span class="text-sm text-slate-600 dark:text-slate-300">I confirm the event information is accurate and accept TicketRush provider terms. This MVP will publish the event immediately; admin approval will be added later.</span>
+              <span class="text-sm text-slate-600 dark:text-slate-300">
+                I confirm the event information and payout account are accurate. I understand
+                TicketRush collects customer payments through the platform account, deducts the 5%
+                platform fee, and settles the remaining provider revenue to the payout account above.
+              </span>
             </label>
           </div>
 
