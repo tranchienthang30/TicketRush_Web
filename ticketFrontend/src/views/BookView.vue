@@ -148,14 +148,36 @@ const seatLegendItems = computed(() => {
   const seen = new Set()
   const items = []
   for (const seat of visibleSeats.value) {
-    const label = seat.seatTypeName || seat.sectionName || seat.seatTypeCode || 'Standard'
+    const label = normalizeSeatLegendLabel(
+      seat.seatTypeName || seat.sectionName || seat.seatTypeCode || 'Standard',
+    )
     const color = seat.visualColorHex || defaultSeatColor(seat.seatTypeCode)
-    const key = `${label.toUpperCase()}-${color}`
+    const key = label.toUpperCase()
     if (seen.has(key)) continue
     seen.add(key)
     items.push({ label, color })
   }
   return items
+})
+
+const screenLabel = computed(() => {
+  const hallName = String(bookingEvent.value?.hallName || '')
+  const hallMatch = hallName.match(/(SCREEN-\d+)/i)
+  if (hallMatch) return hallMatch[1].toUpperCase()
+
+  for (const seat of visibleSeats.value) {
+    const source = `${seat.seatTypeName || ''} ${seat.sectionName || ''} ${seat.seatTypeCode || ''}`
+    const match = source.match(/(SCREEN-\d+)/i)
+    if (match) return match[1].toUpperCase()
+  }
+
+  return ''
+})
+
+const screenDisplayLabel = computed(() => {
+  if (!screenLabel.value) return ''
+  const number = screenLabel.value.replace(/SCREEN-/i, '')
+  return `Screen - ${number}`
 })
 const totalPrice = computed(() =>
   usesSeatsio.value
@@ -278,6 +300,14 @@ function rowToIndex(rowLabel) {
       .toUpperCase()
       .charCodeAt(0) - 64
   )
+}
+
+function normalizeSeatLegendLabel(rawLabel) {
+  const normalized = String(rawLabel || '').trim().toUpperCase()
+  if (normalized.includes('COUPLE')) return 'Couple'
+  if (normalized.includes('VIP')) return 'VIP'
+  if (normalized.includes('STANDARD')) return 'Standard'
+  return String(rawLabel || 'Standard').trim() || 'Standard'
 }
 
 function formatMoney(value) {
@@ -866,6 +896,7 @@ function seatsioObjectCategory(object) {
             </h1>
             <p class="mt-2 text-sm text-slate-500 dark:text-slate-300">
               {{ eventDateLabel }} - {{ bookingEvent?.hallName || 'Venue Area' }}
+              <span v-if="screenDisplayLabel"> - {{ screenDisplayLabel }}</span>
             </p>
           </div>
 
@@ -1033,7 +1064,7 @@ function seatsioObjectCategory(object) {
               </div>
 
               <div
-                class="mt-8 flex flex-wrap justify-center gap-5 text-sm font-bold text-slate-700 dark:text-slate-200"
+                class="mx-auto mt-8 grid max-w-4xl grid-cols-1 gap-x-8 gap-y-4 text-sm font-bold text-slate-700 sm:grid-cols-2 md:grid-cols-3 dark:text-slate-200"
               >
                 <div class="flex items-center gap-2">
                   <span
@@ -1050,7 +1081,11 @@ function seatsioObjectCategory(object) {
                   ></span>
                   Temporarily locked
                 </div>
-                <div v-for="item in seatLegendItems" :key="`${item.label}-${item.color}`" class="flex items-center gap-2">
+                <div
+                  v-for="item in seatLegendItems"
+                  :key="`${item.label}-${item.color}`"
+                  class="flex items-center gap-2"
+                >
                   <span
                     class="inline-block h-4 w-4 rounded border border-slate-300 dark:border-slate-600"
                     :style="{ backgroundColor: item.color }"
