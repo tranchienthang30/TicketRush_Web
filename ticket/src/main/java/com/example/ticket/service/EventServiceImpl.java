@@ -203,9 +203,6 @@ public class EventServiceImpl implements EventService {
         String seatProvider = normalizeSeatProvider(request.seatProvider());
         String listingType = normalizeListingType(request.listingType());
         SaleWindow saleWindow = resolveSaleWindow(request, listingType);
-        if (!seatProvider.equals(event.getSeatProvider())) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "Seat provider cannot be changed after event creation");
-        }
         validateSections(request, seatProvider);
         SeatsioKeys seatsioKeys = resolveSeatsioKeys(user, request, seatProvider);
 

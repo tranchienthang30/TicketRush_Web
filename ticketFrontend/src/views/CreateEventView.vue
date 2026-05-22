@@ -947,9 +947,12 @@ function loadSeatsioScript(cdnUrl) {
           <div v-if="currentStep === 2" class="space-y-5">
             <h2 class="text-xl font-black text-slate-900 dark:text-white">Seat setup</h2>
             <div class="grid grid-cols-2 gap-3 max-w-md">
-              <button type="button" :disabled="isEditMode" :class="form.seatProvider === 'INTERNAL' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold disabled:opacity-60" @click="useSeatProvider('INTERNAL')">Simple</button>
-              <button type="button" :disabled="isEditMode" :class="form.seatProvider === 'SEATS_IO' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold disabled:opacity-60" @click="useSeatProvider('SEATS_IO')">Advanced</button>
+              <button type="button" :class="form.seatProvider === 'INTERNAL' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold" @click="useSeatProvider('INTERNAL')">Simple</button>
+              <button type="button" :class="form.seatProvider === 'SEATS_IO' ? 'bg-brand-orange text-white' : 'bg-slate-100 dark:bg-slate-700 dark:text-white'" class="rounded-xl px-4 py-3 font-bold" @click="useSeatProvider('SEATS_IO')">Advanced</button>
             </div>
+            <p v-if="isEditMode" class="text-sm font-bold text-slate-500 dark:text-slate-300">
+              Seat setup can be changed until ticket sales start. Once sales begin, editing is blocked to protect bookings.
+            </p>
 
             <div v-if="form.seatProvider === 'SEATS_IO'" class="space-y-5">
               <div class="rounded-xl border border-blue-200 bg-blue-50 p-5 text-blue-950">
